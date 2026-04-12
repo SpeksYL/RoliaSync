@@ -1,0 +1,14 @@
+{
+  "name": "roliascan-mal-sync",
+  "version": "1.0.1",
+  "description": "Automatischer Manga-Chapter-Sync von Roliascan auf MyAnimeList",
+  "private": true,
+  "scripts": {
+    "build": "web-ext build --overwrite-dest",
+    "sign": "web-ext sign --channel=unlisted",
+    "lint": "web-ext lint"
+  },
+  "devDependencies": {
+    "web-ext": "^8.0.0"
+  }
+}

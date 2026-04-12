@@ -1,0 +1,274 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Einstellungen – Roliascan → MAL</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: #1a1a2e;
+      color: #e0e0e0;
+      min-height: 100vh;
+    }
+
+    header {
+      background: #16213e;
+      padding: 20px 32px;
+      border-bottom: 2px solid #2196f3;
+    }
+
+    header h1 { font-size: 20px; font-weight: 700; color: #fff; }
+    header p  { font-size: 13px; color: #90caf9; margin-top: 4px; }
+
+    main {
+      max-width: 680px;
+      margin: 0 auto;
+      padding: 32px 24px;
+      display: flex;
+      flex-direction: column;
+      gap: 28px;
+    }
+
+    /* ── Sektionen ── */
+    .section {
+      background: #16213e;
+      border: 1px solid #263238;
+      border-radius: 10px;
+      padding: 20px 22px;
+    }
+
+    .section-title {
+      font-size: 13px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.6px;
+      color: #90caf9;
+      margin-bottom: 14px;
+      padding-bottom: 10px;
+      border-bottom: 1px solid #1e2a3a;
+    }
+
+    /* ── Formular ── */
+    label {
+      display: block;
+      font-size: 12px;
+      font-weight: 600;
+      color: #78909c;
+      margin-bottom: 6px;
+    }
+
+    input[type="text"] {
+      width: 100%;
+      background: #0d1117;
+      border: 1px solid #37474f;
+      border-radius: 8px;
+      padding: 10px 14px;
+      color: #fff;
+      font-size: 14px;
+      font-family: 'Courier New', monospace;
+      outline: none;
+      transition: border-color 0.15s;
+    }
+
+    input[type="text"]:focus { border-color: #2196f3; }
+    input[type="text"]::placeholder { color: #37474f; }
+
+    .hint {
+      font-size: 12px;
+      color: #546e7a;
+      margin-top: 8px;
+      line-height: 1.5;
+    }
+
+    /* ── Redirect URI Anzeige ── */
+    .uri-row {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+      margin-bottom: 8px;
+    }
+
+    .uri-label {
+      font-size: 11px;
+      color: #78909c;
+      white-space: nowrap;
+      min-width: 70px;
+    }
+
+    .uri-value {
+      flex: 1;
+      background: #0d1117;
+      border: 1px solid #263238;
+      border-radius: 6px;
+      padding: 7px 12px;
+      font-size: 12px;
+      font-family: 'Courier New', monospace;
+      color: #a5d6a7;
+      word-break: break-all;
+    }
+
+    .btn-copy {
+      background: #263238;
+      border: 1px solid #37474f;
+      border-radius: 6px;
+      color: #90caf9;
+      font-size: 11px;
+      padding: 6px 10px;
+      cursor: pointer;
+      white-space: nowrap;
+      transition: opacity 0.15s;
+    }
+
+    .btn-copy:hover { opacity: 0.8; }
+    .btn-copy.copied { color: #a5d6a7; border-color: #2e7d32; }
+
+    /* ── Status ── */
+    .status-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 8px 0;
+      font-size: 13px;
+      border-bottom: 1px solid #1e2a3a;
+    }
+
+    .status-row:last-child { border-bottom: none; }
+    .status-key   { color: #78909c; font-size: 12px; }
+    .status-val   { color: #fff; font-weight: 600; }
+    .status-ok    { color: #a5d6a7; }
+    .status-err   { color: #ffab91; }
+
+    /* ── Buttons ── */
+    .btn {
+      padding: 11px 20px;
+      border: none;
+      border-radius: 8px;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: opacity 0.15s;
+    }
+
+    .btn:hover   { opacity: 0.85; }
+    .btn:disabled { opacity: 0.4; cursor: not-allowed; }
+    .btn-primary  { background: #2196f3; color: #fff; }
+    .btn-row { display: flex; gap: 10px; margin-top: 16px; align-items: center; }
+
+    /* ── Meldungen ── */
+    .msg {
+      border-radius: 8px;
+      padding: 10px 14px;
+      font-size: 13px;
+      margin-top: 12px;
+      display: none;
+      line-height: 1.5;
+    }
+
+    .msg-ok  { background: #1b5e20; color: #a5d6a7; }
+    .msg-err { background: #4e342e; color: #ffab91; }
+
+    /* ── Links ── */
+    a {
+      color: #90caf9;
+      text-decoration: none;
+      font-size: 13px;
+    }
+
+    a:hover { text-decoration: underline; }
+
+    .link-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 6px 0;
+      font-size: 13px;
+    }
+
+    .link-row span { color: #546e7a; }
+  </style>
+</head>
+<body>
+
+  <header>
+    <h1>⚙️ Einstellungen – Roliascan → MAL</h1>
+    <p>Konfiguriere deine MyAnimeList API-Zugangsdaten</p>
+  </header>
+
+  <main>
+
+    <!-- MAL Client-ID -->
+    <div class="section">
+      <div class="section-title">MAL Client-ID</div>
+
+      <label for="client-id-input">Client-ID (aus MAL API Config)</label>
+      <input
+        type="text"
+        id="client-id-input"
+        placeholder="z.B. abc123def456..."
+        spellcheck="false"
+        autocomplete="off"
+      />
+      <p class="hint">
+        Die Client-ID findest du unter
+        <a href="https://myanimelist.net/apiconfig" target="_blank">myanimelist.net/apiconfig</a>
+        → deine App → Client ID.
+        Sie wird verschlüsselt in deinem Browser gespeichert und über Firefox Sync synchronisiert.
+      </p>
+
+      <div class="btn-row">
+        <button class="btn btn-primary" id="btn-save">Speichern</button>
+      </div>
+
+      <div class="msg" id="save-msg"></div>
+    </div>
+
+    <!-- Redirect URI (zum Kopieren für MAL) -->
+    <div class="section">
+      <div class="section-title">Redirect URI für MAL API Config</div>
+      <p class="hint" style="margin-bottom:14px;">
+        Trage diese URI in deine
+        <a href="https://myanimelist.net/apiconfig" target="_blank">MAL App-Konfiguration</a>
+        ein (Feld „Redirect URI").
+      </p>
+
+      <div class="uri-row">
+        <span class="uri-value" id="uri-firefox">–</span>
+        <button class="btn-copy" data-target="uri-firefox">Kopieren</button>
+      </div>
+    </div>
+
+    <!-- Login-Status -->
+    <div class="section">
+      <div class="section-title">MAL Login-Status</div>
+
+      <div class="status-row">
+        <span class="status-key">Angemeldet als</span>
+        <span class="status-val" id="status-username">–</span>
+      </div>
+      <div class="status-row">
+        <span class="status-key">Client-ID gespeichert</span>
+        <span class="status-val" id="status-clientid">–</span>
+      </div>
+    </div>
+
+    <!-- Links -->
+    <div class="section">
+      <div class="section-title">Nützliche Links</div>
+      <div class="link-row">
+        <span>🔧</span>
+        <a href="https://myanimelist.net/apiconfig" target="_blank">MAL API Config – App verwalten</a>
+      </div>
+      <div class="link-row">
+        <span>📋</span>
+        <a href="https://myanimelist.net/apiconfig/references/api/v2" target="_blank">MAL API Dokumentation (v2)</a>
+      </div>
+    </div>
+
+  </main>
+
+  <script src="options.js"></script>
+</body>
+</html>
