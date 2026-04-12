@@ -1,13 +1,17 @@
 {
   "manifest_version": 2,
   "name": "Roliascan → MAL Sync",
-  "version": "1.0.7",
+  "version": "1.0.8",
   "description": "Synct gelesene Manga-Chapter von Roliascan automatisch auf MyAnimeList.",
 
   "browser_specific_settings": {
     "gecko": {
       "id": "roliascan-mal-sync@nimo",
-      "strict_min_version": "109.0"
+      "strict_min_version": "109.0",
+      "data_collection_permissions": {
+        "required": [],
+        "optional": []
+      }
     }
   },
 

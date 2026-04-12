@@ -66,14 +66,18 @@ function hideStatus() {
 }
 
 function setSearchLoading(loading) {
+  btnSearch.textContent = '';
   if (loading) {
-    btnSearch.innerHTML  = '<span class="spinner-inline"></span>Suche …';
+    const spinner = document.createElement('span');
+    spinner.className = 'spinner-inline';
+    btnSearch.appendChild(spinner);
+    btnSearch.appendChild(document.createTextNode('Suche …'));
     btnSearch.disabled   = true;
     searchInput.disabled = true;
   } else {
-    btnSearch.innerHTML  = 'Suchen';
-    btnSearch.disabled   = false;
-    searchInput.disabled = false;
+    btnSearch.textContent = 'Suchen';
+    btnSearch.disabled    = false;
+    searchInput.disabled  = false;
   }
 }
 
@@ -109,22 +113,18 @@ function renderResults(results) {
     const li = document.createElement('li');
     li.dataset.malId = id;
 
-    li.innerHTML = `
-      <span class="title">${escapeHtml(title)}</span>
-      <span class="mal-id">ID: ${id}</span>
-    `;
+    const spanTitle = document.createElement('span');
+    spanTitle.className   = 'title';
+    spanTitle.textContent = title;
+    const spanId = document.createElement('span');
+    spanId.className   = 'mal-id';
+    spanId.textContent = `ID: ${id}`;
+    li.appendChild(spanTitle);
+    li.appendChild(spanId);
 
     li.addEventListener('click', () => selectResult(id, title));
     resultsList.appendChild(li);
   });
-}
-
-function escapeHtml(str) {
-  return String(str ?? '')
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;');
 }
 
 // ─── Suche ausführen ──────────────────────────────────────────────────────────
@@ -157,8 +157,12 @@ async function doSearch() {
 async function doAssign() {
   if (!selectedMalId || !selectedMalTitle || !currentSlug) return;
 
-  btnAssign.innerHTML  = '<span class="spinner-inline"></span>Speichern …';
-  btnAssign.disabled   = true;
+  btnAssign.textContent = '';
+  const assignSpinner = document.createElement('span');
+  assignSpinner.className = 'spinner-inline';
+  btnAssign.appendChild(assignSpinner);
+  btnAssign.appendChild(document.createTextNode('Speichern …'));
+  btnAssign.disabled = true;
 
   try {
     const res = await sendMsg('SAVE_MAPPING', {
@@ -174,13 +178,13 @@ async function doAssign() {
       `Der ausstehende Sync wird jetzt automatisch wiederholt.`
     );
 
-    btnAssign.innerHTML = '✅ Gespeichert';
+    btnAssign.textContent = '✅ Gespeichert';
     // Seite nach kurzer Verzögerung schließen
     setTimeout(() => window.close(), 2500);
 
   } catch (err) {
     showStatus('error', `Fehler beim Speichern: ${err.message}`);
-    btnAssign.innerHTML = 'Zuweisen & Speichern';
+    btnAssign.textContent = 'Zuweisen & Speichern';
     btnAssign.disabled  = false;
   }
 }

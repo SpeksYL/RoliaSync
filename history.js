@@ -43,42 +43,47 @@ function absoluteTime(timestamp) {
   });
 }
 
-function escapeHtml(str) {
-  return String(str ?? '')
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;');
-}
+function buildStatusCell(entry, td) {
+  const badge = document.createElement('span');
+  badge.className = 'status-badge';
 
-function buildStatusCell(entry) {
   if (entry.status === 'success') {
-    return '<span class="status-badge status-success">✅ Erfolgreich</span>';
+    badge.classList.add('status-success');
+    badge.textContent = '✅ Erfolgreich';
+  } else if (entry.status === 'error') {
+    badge.classList.add('status-error');
+    badge.textContent = '⚠️ Fehler';
+    const msg = entry.errorMsg ?? 'Unbekannter Fehler';
+    badge.title = msg;
+    badge.dataset.tooltip = msg;
+  } else if (entry.status === 'not_found') {
+    badge.classList.add('status-not-found');
+    badge.textContent = '🔍 Nicht gefunden';
+    const msg = entry.errorMsg ?? 'Nicht auf MAL gefunden';
+    badge.title = msg;
+    badge.dataset.tooltip = msg;
+  } else if (entry.status === 'skipped') {
+    badge.classList.add('status-skipped');
+    badge.textContent = '⏭️ Übersprungen';
+    if (entry.errorMsg) badge.title = entry.errorMsg;
+    if (entry.malId) {
+      const btn = document.createElement('button');
+      btn.className        = 'btn-force-sync';
+      btn.textContent      = '🔄 Trotzdem syncen';
+      btn.dataset.manga    = entry.manga    ?? '';
+      btn.dataset.chapter  = String(entry.chapter ?? '');
+      btn.dataset.malid    = String(entry.malId);
+      btn.dataset.maltitle = entry.malTitle ?? entry.manga ?? '';
+      td.appendChild(badge);
+      td.appendChild(btn);
+      return;
+    }
+  } else {
+    badge.classList.add('status-pending');
+    badge.textContent = '⏳ Ausstehend';
   }
-  if (entry.status === 'error') {
-    const tooltip = escapeHtml(entry.errorMsg ?? 'Unbekannter Fehler');
-    return `<span class="status-badge status-error" data-tooltip="${tooltip}" title="${tooltip}">⚠️ Fehler</span>`;
-  }
-  if (entry.status === 'not_found') {
-    const tooltip = escapeHtml(entry.errorMsg ?? 'Nicht auf MAL gefunden');
-    return `<span class="status-badge status-not-found" data-tooltip="${tooltip}" title="${tooltip}">🔍 Nicht gefunden</span>`;
-  }
-  if (entry.status === 'skipped') {
-    const tooltip = escapeHtml(entry.errorMsg ?? '');
-    const malId   = entry.malId   ? escapeHtml(String(entry.malId))   : '';
-    const title   = entry.malTitle ? escapeHtml(entry.malTitle) : escapeHtml(entry.manga ?? '');
-    const manga   = escapeHtml(entry.manga ?? '');
-    const chapter = escapeHtml(String(entry.chapter ?? ''));
-    return `
-      <span class="status-badge status-skipped" title="${tooltip}">⏭️ Übersprungen</span>
-      <button class="btn-force-sync"
-        data-manga="${manga}"
-        data-chapter="${chapter}"
-        data-malid="${malId}"
-        data-maltitle="${title}">🔄 Trotzdem syncen</button>
-    `;
-  }
-  return '<span class="status-badge status-pending">⏳ Ausstehend</span>';
+
+  td.appendChild(badge);
 }
 
 function sendMsg(type, payload = {}) {
@@ -109,28 +114,45 @@ function renderHistory(history) {
   tableWrapper.style.display = 'block';
   clearArea.style.display    = 'block';
 
-  const rows = history.map(entry => {
-    const title    = escapeHtml(entry.malTitle ?? entry.manga ?? '–');
-    const slug     = escapeHtml(entry.manga ?? '');
-    const chapter  = escapeHtml(entry.chapter ?? '–');
-    const timeRel  = escapeHtml(relativeTime(entry.timestamp));
-    const timeAbs  = escapeHtml(absoluteTime(entry.timestamp));
-    const statusCell = buildStatusCell(entry);
+  historyBody.textContent = '';
+  history.forEach(entry => {
+    const title   = entry.malTitle ?? entry.manga ?? '–';
+    const slug    = entry.manga ?? '';
 
-    return `
-      <tr>
-        <td class="td-title">
-          ${title}
-          ${title !== slug ? `<div class="slug">${slug}</div>` : ''}
-        </td>
-        <td class="td-chapter">Ch. ${chapter}</td>
-        <td class="td-time" title="${timeAbs}">${timeRel}</td>
-        <td>${statusCell}</td>
-      </tr>
-    `;
+    const tr = document.createElement('tr');
+
+    // Titel
+    const tdTitle = document.createElement('td');
+    tdTitle.className   = 'td-title';
+    tdTitle.textContent = title;
+    if (title !== slug && slug) {
+      const slugDiv = document.createElement('div');
+      slugDiv.className   = 'slug';
+      slugDiv.textContent = slug;
+      tdTitle.appendChild(slugDiv);
+    }
+
+    // Chapter
+    const tdChapter = document.createElement('td');
+    tdChapter.className   = 'td-chapter';
+    tdChapter.textContent = `Ch. ${entry.chapter ?? '–'}`;
+
+    // Zeit
+    const tdTime = document.createElement('td');
+    tdTime.className   = 'td-time';
+    tdTime.title       = absoluteTime(entry.timestamp);
+    tdTime.textContent = relativeTime(entry.timestamp);
+
+    // Status
+    const tdStatus = document.createElement('td');
+    buildStatusCell(entry, tdStatus);
+
+    tr.appendChild(tdTitle);
+    tr.appendChild(tdChapter);
+    tr.appendChild(tdTime);
+    tr.appendChild(tdStatus);
+    historyBody.appendChild(tr);
   });
-
-  historyBody.innerHTML = rows.join('');
 }
 
 // ─── Init ─────────────────────────────────────────────────────────────────────

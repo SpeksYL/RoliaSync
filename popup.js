@@ -63,11 +63,24 @@ function relativeTime(timestamp) {
   return new Date(timestamp).toLocaleDateString('de-DE');
 }
 
-function statusBadge(status) {
-  if (status === 'success')   return '<span class="status-badge status-success">✅ Erfolgreich</span>';
-  if (status === 'error')     return '<span class="status-badge status-error">⚠️ Fehler</span>';
-  if (status === 'not_found') return '<span class="status-badge status-none">🔍 Nicht gefunden</span>';
-  return '<span class="status-badge status-none">Ausstehend</span>';
+function setStatusBadge(el, status) {
+  el.textContent = '';
+  const span = document.createElement('span');
+  span.className = 'status-badge ';
+  if (status === 'success') {
+    span.className += 'status-success';
+    span.textContent = '✅ Erfolgreich';
+  } else if (status === 'error') {
+    span.className += 'status-error';
+    span.textContent = '⚠️ Fehler';
+  } else if (status === 'not_found') {
+    span.className += 'status-none';
+    span.textContent = '🔍 Nicht gefunden';
+  } else {
+    span.className += 'status-none';
+    span.textContent = 'Ausstehend';
+  }
+  el.appendChild(span);
 }
 
 function sendMsg(type, payload = {}) {
@@ -100,7 +113,7 @@ function showLoggedin(username, lastEntry) {
   if (lastEntry) {
     lastTitleEl.textContent   = lastEntry.malTitle ?? lastEntry.manga ?? '–';
     lastChapterEl.textContent = lastEntry.chapter  ? `Ch. ${lastEntry.chapter}` : '–';
-    lastStatusEl.innerHTML    = statusBadge(lastEntry.status);
+    setStatusBadge(lastStatusEl, lastEntry.status);
     lastTimeEl.textContent    = relativeTime(lastEntry.timestamp);
   }
 }
