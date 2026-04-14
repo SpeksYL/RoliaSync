@@ -11,8 +11,7 @@
 // ─── Browser-API Polyfill ─────────────────────────────────────────────────────
 const api = typeof browser !== 'undefined' ? browser : chrome;
 
-// Regex laut CLAUDE.md:
-// /roliascan\.com\/read\/([\w-]+)\/ch([\d.]+)-\d+/
+// URL-Pattern: /read/{slug}/ch{nummer}-{id}/
 const CHAPTER_REGEX = /roliascan\.com\/read\/([\w-]+)\/ch([\d.]+)-\d+/;
 
 function parseCurrentUrl() {
@@ -39,9 +38,7 @@ function sendSync(parsed) {
           api.runtime.lastError.message);
         return;
       }
-      if (response?.ok) {
-        console.log(`[MAL Sync] Sync gestartet: ${parsed.slug} Ch.${parsed.chapter}`);
-      } else {
+      if (!response?.ok) {
         console.warn('[MAL Sync] Sync fehlgeschlagen:', response?.error);
       }
     }
@@ -53,10 +50,7 @@ function sendSync(parsed) {
 
 function tryInitialSync() {
   const parsed = parseCurrentUrl();
-  if (parsed) {
-    console.log(`[MAL Sync] Seite geladen – starte Sync: ${parsed.slug} Ch.${parsed.chapter}`);
-    sendSync(parsed);
-  }
+  if (parsed) sendSync(parsed);
 }
 
 if (document.readyState === 'complete') {
@@ -78,8 +72,6 @@ const observer = new MutationObserver(() => {
 
   const parsed = parseCurrentUrl();
   if (!parsed) return;
-
-  console.log(`[MAL Sync] URL-Wechsel erkannt – warte auf Seiteninhalt: ${parsed.slug} Ch.${parsed.chapter}`);
 
   if (document.readyState === 'complete') {
     // SPA-Navigation: readyState bleibt 'complete', daher kleiner Puffer

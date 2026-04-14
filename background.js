@@ -1,5 +1,5 @@
 /**
- * background.js — Service Worker (Chrome MV3) / Background Script (Firefox MV2)
+ * background.js — Background Script (Firefox MV2)
  * Verwaltet OAuth2 PKCE Flow, MAL API Calls, Storage und Slug-Mappings.
  */
 
@@ -18,10 +18,8 @@ const MAX_HISTORY        = 50;
 const RETRY_DELAY_MS     = 3000;
 
 // ─── storage.sync Hilfsfunktionen ────────────────────────────────────────────
-// slugMappings und mal_token werden in storage.sync gespeichert damit sie
-// über alle Geräte synchronisiert werden (Firefox Sync / Chrome Sync).
-// Fallback auf storage.local wenn storage.sync nicht verfügbar ist
-// (Chrome ohne eingeloggten Account, oder bei Quota-Überschreitung).
+// slugMappings und mal_token liegen in storage.sync (Firefox Sync).
+// Fallback auf storage.local bei Quota-Überschreitung oder fehlender Sync-Verbindung.
 
 async function syncGet(key) {
   try {
@@ -35,7 +33,6 @@ async function syncSet(obj) {
   try {
     await api.storage.sync.set(obj);
   } catch {
-    // Fallback: lokal speichern (z.B. Chrome ohne Google-Login)
     await api.storage.local.set(obj);
   }
 }
@@ -89,10 +86,8 @@ function base64UrlEncode(buffer) {
 // Sie muss einmalig in der MAL API Config als Redirect URI eingetragen werden.
 
 async function handleOAuthCode(code) {
-  console.log('[MAL Auth] Code empfangen, Länge:', code?.length);
   try {
     await exchangeCodeForToken(code);
-    console.log('[MAL Auth] Token erfolgreich gespeichert.');
   } catch (err) {
     console.error('[MAL Auth] Token-Austausch fehlgeschlagen:', err.message);
     await showNotification('error', `MAL Login fehlgeschlagen: ${err.message}`);
@@ -104,7 +99,6 @@ async function startOAuthFlowFirefox() {
   await api.storage.local.set({ pkce_verifier: codeVerifier });
 
   const redirectUri = api.identity.getRedirectURL();
-  console.log('[MAL Auth] Redirect URI:', redirectUri);
 
   const authUrl = MAL_AUTH_URL + '?' + new URLSearchParams({
     response_type:         'code',
@@ -120,8 +114,6 @@ async function startOAuthFlowFirefox() {
     interactive: true,
   });
 
-  console.log('[MAL Auth] Response URL:', responseUrl);
-
   const match = responseUrl.match(/[?&]code=([^&]+)/);
   const code  = match ? match[1] : null;
 
@@ -136,10 +128,9 @@ async function startOAuthFlowFirefox() {
 
 async function startOAuthFlow() {
   await startOAuthFlowFirefox();
-  return { pending: true };
 }
 
-// ─── Token-Austausch (gemeinsam für Chrome + Firefox) ────────────────────────
+// ─── Token-Austausch ─────────────────────────────────────────────────────────
 
 async function exchangeCodeForToken(code) {
   const clientId      = await getClientId();
@@ -148,9 +139,8 @@ async function exchangeCodeForToken(code) {
   const redirectUri   = api.identity.getRedirectURL();
 
   if (!pkce_verifier) {
-    throw new Error('PKCE-Verifier nicht im Storage gefunden – bitte erneut anmelden');
+    throw new Error('PKCE-Verifier nicht im Storage – bitte erneut anmelden');
   }
-  console.log('[MAL Auth] Verifier aus Storage gelesen, Länge:', pkce_verifier.length);
 
   const body = new URLSearchParams({
     client_id:     clientId,
@@ -173,8 +163,7 @@ async function exchangeCodeForToken(code) {
 
   const data = await res.json();
   await saveToken(data);
-  await api.storage.local.remove(['pkce_verifier', 'oauth_redirect_uri']);
-  console.log('[MAL Auth] Token gespeichert, Verifier gelöscht.');
+  await api.storage.local.remove('pkce_verifier');
 }
 
 // ─── Token-Verwaltung ─────────────────────────────────────────────────────────
@@ -325,17 +314,14 @@ async function getMalId(slug) {
 
   if (slugMappings[slug]) {
     const mapping = slugMappings[slug];
-    console.log(`[MAL Sync] Slug-Mapping gefunden: ${slug} → ID ${mapping.id}`);
     return { malId: mapping.id, malTitle: mapping.title };
   }
 
   const result = await searchMangaAuth(slug);
   if (result) {
-    console.log(`[MAL Sync] MAL-Suche erfolgreich: ${slug} → ${result.title}`);
     return { malId: result.id, malTitle: result.title };
   }
 
-  console.warn(`[MAL Sync] Manga nicht gefunden: ${slug}`);
   throw new NotFoundError(slug);
 }
 
@@ -343,7 +329,6 @@ async function saveSlugMapping(slug, malId, malTitle) {
   const { slugMappings = {} } = await syncGet('slugMappings');
   slugMappings[slug] = { id: malId, title: malTitle };
   await syncSet({ slugMappings });
-  console.log(`[MAL Sync] Mapping gespeichert: ${slug} → ${malTitle} (ID ${malId})`);
 }
 
 // ─── Sync-Logik ───────────────────────────────────────────────────────────────
@@ -354,7 +339,6 @@ async function syncChapter(slug, chapter) {
   // Duplikat-Schutz: gleicher Chapter wie zuletzt gesynct → lautlos überspringen
   const { last_sync } = await api.storage.local.get('last_sync');
   if (last_sync?.slug === slug && String(last_sync?.chapter) === String(chapter)) {
-    console.log(`[MAL Sync] Übersprungen (Duplikat): ${slug} Ch.${chapter}`);
     return;
   }
 
@@ -387,11 +371,7 @@ async function syncChapter(slug, chapter) {
     // Aktuellen MAL-Fortschritt abrufen
     const currentChapter = await getMalListStatus(malId);
 
-    console.log(`[MAL Sync] ${slug}: lokal Ch.${chapterNum}, MAL Ch.${currentChapter}`);
-
     if (chapterNum === currentChapter) {
-      // Exakt gleich → bereits gesynct, kein Eintrag
-      console.log(`[MAL Sync] Bereits gesynct: ${slug} Ch.${chapter}`);
       return 'skip';
     }
 
@@ -447,30 +427,6 @@ async function syncChapter(slug, chapter) {
   if (result === 'skip') return;
 
   await addHistoryEntry(historyEntry);
-}
-
-// ─── Test-Funktion ────────────────────────────────────────────────────────────
-
-async function testSync() {
-  const slug     = 'spy-x-family';
-  const chapter  = '1';
-  const malTitle = 'Spy x Family';
-
-  console.log(`[MAL Sync] TEST: Würde syncen → ${slug} Ch.${chapter} (MAL: "${malTitle}")`);
-  console.log(`[MAL Sync] TEST: PATCH ${MAL_API_BASE}/manga/119703/my_list_status`);
-  console.log(`[MAL Sync] TEST: Body: { num_chapters_read: 1, status: "reading" }`);
-
-  const entry = {
-    manga: slug, malTitle, chapter,
-    timestamp: Date.now(),
-    status: 'success',
-    errorMsg: null,
-  };
-
-  await addHistoryEntry(entry);
-  await showNotification('success', `[TEST] ${malTitle} – Chapter ${chapter} auf MAL gespeichert`);
-  console.log('[MAL Sync] TEST: History-Eintrag gespeichert, Notification angezeigt.');
-  return { ok: true, entry };
 }
 
 // ─── History ──────────────────────────────────────────────────────────────────
@@ -542,19 +498,13 @@ api.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
       })();
       return true;
 
-    case 'TEST_SYNC':
-      testSync()
-        .then(result => sendResponse(result))
-        .catch(err => sendResponse({ ok: false, error: err.message }));
-      return true;
-
     case 'START_LOGIN':
       startOAuthFlow()
         .then(result => sendResponse({ ok: true, ...result }))
         .catch(err  => sendResponse({ ok: false, error: err.message }));
       return true;
 
-    // Empfängt den Authorization Code von redirect.html (Firefox-Flow)
+    // Fallback: Authorization Code aus options.html ?code= Parameter
     case 'OAUTH_CODE':
       exchangeCodeForToken(msg.code)
         .then(() => sendResponse({ ok: true }))
@@ -606,7 +556,6 @@ api.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
           const { pending_sync } = await api.storage.local.get('pending_sync');
           if (pending_sync && pending_sync.slug === msg.slug) {
             await api.storage.local.remove(['pending_sync', 'last_sync']);
-            console.log(`[MAL Sync] Retry nach Mapping: ${msg.slug} Ch.${pending_sync.chapter}`);
             await syncChapter(msg.slug, pending_sync.chapter);
           }
           sendResponse({ ok: true });
@@ -640,7 +589,6 @@ api.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
           const id = (msg.clientId ?? '').trim();
           if (!id) throw new Error('Client-ID darf nicht leer sein');
           await syncSet({ mal_client_id: id });
-          console.log('[MAL Config] Client-ID gespeichert.');
           sendResponse({ ok: true });
         } catch (err) {
           sendResponse({ ok: false, error: err.message });

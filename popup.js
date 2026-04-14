@@ -36,13 +36,6 @@ function showError(msg) {
   errorMsgEl.style.background = '';  // Standard-Fehlerfarbe (aus CSS)
 }
 
-function showInfo(msg) {
-  errorMsgEl.textContent    = msg;
-  errorMsgEl.style.display  = 'block';
-  errorMsgEl.style.background = '#1a237e';  // Blau für Info
-  errorMsgEl.style.color      = '#90caf9';
-}
-
 function clearError() {
   errorMsgEl.style.display = 'none';
   errorMsgEl.textContent   = '';
@@ -118,33 +111,6 @@ function showLoggedin(username, lastEntry) {
   }
 }
 
-// ─── Firefox: auf Login-Abschluss warten (Polling) ───────────────────────────
-
-async function pollForLogin() {
-  // Bis zu 5 Minuten in 2-Sekunden-Intervallen auf Token warten
-  showInfo('Browser-Tab geöffnet – bitte bei MAL anmelden …');
-  loading.style.display       = 'none';
-  viewLoggedout.style.display = 'block';
-  btnLogin.disabled    = true;
-  btnLogin.textContent = 'Warte auf Anmeldung …';
-
-  for (let i = 0; i < 150; i++) {
-    await new Promise(r => setTimeout(r, 2000));
-    try {
-      const status = await sendMsg('GET_STATUS');
-      if (status.loggedIn) {
-        clearError();
-        showLoggedin(status.username, status.lastEntry);
-        return;
-      }
-    } catch { /* ignorieren, weiter warten */ }
-  }
-
-  showError('Anmeldung abgelaufen – bitte erneut versuchen.');
-  btnLogin.disabled    = false;
-  btnLogin.textContent = '🔑 Mit MAL anmelden';
-}
-
 // ─── Init ─────────────────────────────────────────────────────────────────────
 
 async function init() {
@@ -173,16 +139,8 @@ btnLogin.addEventListener('click', async () => {
 
   try {
     const res = await sendMsg('START_LOGIN');
-
-    if (res.pending) {
-      // Firefox: Tab wurde geöffnet, auf Abschluss per Polling warten
-      await pollForLogin();
-    } else if (!res.ok) {
-      throw new Error(res.error ?? 'Login fehlgeschlagen');
-    } else {
-      // Chrome: OAuth direkt abgeschlossen
-      await init();
-    }
+    if (!res.ok) throw new Error(res.error ?? 'Login fehlgeschlagen');
+    await init();
   } catch (err) {
     showError(`Anmeldung fehlgeschlagen: ${err.message}`);
     btnLogin.disabled    = false;

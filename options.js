@@ -7,31 +7,6 @@
 
 const api = typeof browser !== 'undefined' ? browser : chrome;
 
-// ─── OAuth Redirect Empfang ───────────────────────────────────────────────────
-// options.html dient als Redirect URI für den Firefox OAuth Flow.
-// MAL leitet nach dem Login auf options.html?code=... weiter.
-// Der Code wird sofort ans Background Script weitergeleitet.
-(function handleOAuthRedirect() {
-  const urlParams = new URLSearchParams(window.location.search);
-  const code = urlParams.get('code');
-  if (!code) return;
-
-  console.log('[MAL Auth] OAuth-Code in options.html empfangen, Länge:', code.length);
-  api.runtime.sendMessage({ type: 'OAUTH_CODE', code }, (response) => {
-    if (api.runtime.lastError) {
-      console.error('[MAL Auth] Fehler beim Senden des Codes:', api.runtime.lastError.message);
-      return;
-    }
-    if (response?.ok) {
-      console.log('[MAL Auth] Code erfolgreich verarbeitet.');
-      // URL bereinigen – verhindert erneuten Send beim Neuladen der Seite
-      window.history.replaceState({}, document.title, window.location.pathname);
-    } else {
-      console.error('[MAL Auth] Token-Fehler:', response?.error);
-    }
-  });
-})();
-
 // ─── DOM-Referenzen ───────────────────────────────────────────────────────────
 const clientIdInput   = document.getElementById('client-id-input');
 const btnSave         = document.getElementById('btn-save');
