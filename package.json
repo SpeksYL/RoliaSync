@@ -1,5 +1,5 @@
 {
-  "name": "roliascan-mal-sync",
+  "name": "roliasync",
   "version": "1.0.1",
   "description": "Automatischer Manga-Chapter-Sync von Roliascan auf MyAnimeList",
   "private": true,

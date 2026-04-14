@@ -1,4 +1,4 @@
-# Roliascan → MAL Sync
+# RoliaSync
 
 > Firefox-Extension die gelesene Manga-Chapter von [roliascan.com](https://roliascan.com) automatisch auf [MyAnimeList](https://myanimelist.net) synct.
 
