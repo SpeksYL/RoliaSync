@@ -82,8 +82,17 @@
     /* ── Tabelle ── */
     .table-wrapper {
       overflow-x: auto;
+      -webkit-overflow-scrolling: touch;
       border-radius: 10px;
       border: 1px solid #263238;
+    }
+
+    @media (max-width: 480px) {
+      header { padding: 12px 16px; }
+      header h1 { font-size: 16px; }
+      main { padding: 16px 10px; }
+      th, td { padding: 10px 10px; }
+      .td-title { max-width: 140px; }
     }
 
     table {
