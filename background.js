@@ -358,7 +358,7 @@ async function syncChapter(slug, chapter) {
     api.notifications.create(`not_found_${slug}`, {
       type:     'basic',
       iconUrl:  'icons/icon48.png',
-      title:    '⚠️ Roliascan → MAL',
+      title:    '⚠️ RoliaSync',
       message:  `${slug} nicht auf MAL gefunden – Manuell zuweisen?`,
       priority: 1,
     });
@@ -444,7 +444,7 @@ async function showNotification(type, message) {
   api.notifications.create({
     type:    'basic',
     iconUrl: 'icons/icon48.png',
-    title:   type === 'success' ? '✅ Roliascan → MAL' : '⚠️ Roliascan → MAL',
+    title:   type === 'success' ? '✅ RoliaSync' : '⚠️ RoliaSync',
     message,
   });
 }

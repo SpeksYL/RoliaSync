@@ -1,0 +1,21 @@
+{
+  "build": {
+    "filename": "roliasync-{version}.zip",
+    "overwriteDest": true,
+    "excludeFiles": [
+      "*.zip",
+      "package.json",
+      "package-lock.json",
+      "web-ext-config.json",
+      ".gitignore",
+      "README.md",
+      "node_modules/**"
+    ]
+  },
+  "sign": {
+    "channel": "unlisted"
+  },
+  "lint": {
+    "warningsAsErrors": false
+  }
+}
