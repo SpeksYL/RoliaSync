@@ -1,6 +1,7 @@
 /**
  * options.js — Einstellungsseite
  * Konfiguriert MAL Client-ID und zeigt Redirect URIs an.
+ * Behandelt auch den Android OAuth Callback (?code= in URL).
  */
 
 'use strict';
@@ -12,6 +13,8 @@ const clientIdInput   = document.getElementById('client-id-input');
 const btnSave         = document.getElementById('btn-save');
 const saveMsg         = document.getElementById('save-msg');
 const uriFfEl         = document.getElementById('uri-firefox');
+const uriAndroidEl    = document.getElementById('uri-android');
+const uriFfRowEl      = document.getElementById('uri-firefox-row');
 const statusUsername  = document.getElementById('status-username');
 const statusClientId  = document.getElementById('status-clientid');
 
@@ -35,6 +38,31 @@ function showSaveMsg(type, text) {
   saveMsg.style.display = 'block';
 }
 
+// ─── Android OAuth Callback ───────────────────────────────────────────────────
+// Wenn MAL auf Android zu options.html?code=... weiterleitet, Code abfangen
+// und an background.js schicken.
+
+(function handleAndroidOAuthCallback() {
+  const params = new URLSearchParams(window.location.search);
+  const code   = params.get('code');
+  if (!code) return;
+
+  // URL sofort bereinigen
+  window.history.replaceState({}, '', window.location.pathname);
+
+  api.runtime.sendMessage({ type: 'OAUTH_CODE', code }, (response) => {
+    if (api.runtime.lastError) {
+      showSaveMsg('err', `Login-Fehler: ${api.runtime.lastError.message}`);
+      return;
+    }
+    if (response?.ok) {
+      showSaveMsg('ok', '✅ Erfolgreich mit MAL verbunden!');
+    } else {
+      showSaveMsg('err', `Login fehlgeschlagen: ${response?.error ?? 'Unbekannter Fehler'}`);
+    }
+  });
+})();
+
 // ─── Init ─────────────────────────────────────────────────────────────────────
 
 async function init() {
@@ -42,8 +70,22 @@ async function init() {
     // Konfiguration aus background laden
     const cfg = await sendMsg('GET_CONFIG');
     if (cfg.ok) {
-      clientIdInput.value  = cfg.clientId;
-      uriFfEl.textContent  = cfg.firefoxRedirect || '–';
+      clientIdInput.value = cfg.clientId;
+
+      // Desktop Redirect URI (nur auf Desktop verfügbar)
+      if (cfg.firefoxRedirect) {
+        uriFfEl.textContent = cfg.firefoxRedirect;
+        if (uriFfRowEl) uriFfRowEl.style.display = '';
+      } else {
+        uriFfEl.textContent = '–';
+        // Desktop-Zeile ausblenden wenn nicht verfügbar (z.B. auf Android)
+        if (uriFfRowEl) uriFfRowEl.style.display = 'none';
+      }
+
+      // Android Redirect URI
+      if (uriAndroidEl) {
+        uriAndroidEl.textContent = cfg.androidRedirect || '–';
+      }
     }
 
     // Login-Status

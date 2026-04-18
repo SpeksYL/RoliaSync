@@ -81,9 +81,9 @@ function base64UrlEncode(buffer) {
     .replace(/=/g, '');
 }
 
-// ─── OAuth2 – Firefox (identity.launchWebAuthFlow) ───────────────────────────
-// Die Redirect URI ist eine stabile allizom.org URL, gebunden an die gecko-ID.
-// Sie muss einmalig in der MAL API Config als Redirect URI eingetragen werden.
+// ─── OAuth2 – Desktop (identity.launchWebAuthFlow) ───────────────────────────
+// Auf Desktop: stabile allizom.org Redirect URI via browser.identity.
+// Auf Android: identity.launchWebAuthFlow nicht verfügbar → Tab-basierter Flow.
 
 async function handleOAuthCode(code) {
   try {
@@ -94,8 +94,9 @@ async function handleOAuthCode(code) {
   }
 }
 
-async function startOAuthFlowFirefox() {
+async function startOAuthFlowDesktop() {
   const codeVerifier = generateCodeVerifier();
+  // android_redirect_uri NICHT setzen → exchangeCodeForToken nutzt identity API
   await api.storage.local.set({ pkce_verifier: codeVerifier });
 
   const redirectUri = api.identity.getRedirectURL();
@@ -126,17 +127,55 @@ async function startOAuthFlowFirefox() {
   await handleOAuthCode(code);
 }
 
+async function startOAuthFlowAndroid() {
+  const codeVerifier = generateCodeVerifier();
+  const redirectUri  = api.runtime.getURL('options.html');
+
+  // Redirect URI mitspeichern damit exchangeCodeForToken sie beim Callback kennt
+  await api.storage.local.set({
+    pkce_verifier:        codeVerifier,
+    android_redirect_uri: redirectUri,
+  });
+
+  const authUrl = MAL_AUTH_URL + '?' + new URLSearchParams({
+    response_type:         'code',
+    client_id:             await getClientId(),
+    redirect_uri:          redirectUri,
+    code_challenge:        codeVerifier,
+    code_challenge_method: 'plain',
+    state:                 crypto.randomUUID(),
+  }).toString();
+
+  // Tab öffnen – MAL leitet zu options.html?code=... zurück
+  // options.js erkennt den Code und schickt OAUTH_CODE Message
+  await api.tabs.create({ url: authUrl });
+}
+
 async function startOAuthFlow() {
-  await startOAuthFlowFirefox();
+  const hasWebAuthFlow = typeof api.identity !== 'undefined' &&
+                         typeof api.identity.launchWebAuthFlow === 'function';
+  if (hasWebAuthFlow) {
+    return startOAuthFlowDesktop();
+  }
+  return startOAuthFlowAndroid();
 }
 
 // ─── Token-Austausch ─────────────────────────────────────────────────────────
 
 async function exchangeCodeForToken(code) {
-  const clientId      = await getClientId();
-  const stored        = await api.storage.local.get('pkce_verifier');
+  const clientId = await getClientId();
+  const stored   = await api.storage.local.get(['pkce_verifier', 'android_redirect_uri']);
   const pkce_verifier = stored.pkce_verifier;
-  const redirectUri   = api.identity.getRedirectURL();
+
+  // Android Flow speichert Redirect URI; Desktop nutzt identity.getRedirectURL()
+  let redirectUri;
+  if (stored.android_redirect_uri) {
+    redirectUri = stored.android_redirect_uri;
+  } else if (api.identity && api.identity.getRedirectURL) {
+    redirectUri = api.identity.getRedirectURL();
+  } else {
+    throw new Error('Redirect URI nicht verfügbar – bitte erneut anmelden');
+  }
 
   if (!pkce_verifier) {
     throw new Error('PKCE-Verifier nicht im Storage – bitte erneut anmelden');
@@ -163,7 +202,7 @@ async function exchangeCodeForToken(code) {
 
   const data = await res.json();
   await saveToken(data);
-  await api.storage.local.remove('pkce_verifier');
+  await api.storage.local.remove(['pkce_verifier', 'android_redirect_uri']);
 }
 
 // ─── Token-Verwaltung ─────────────────────────────────────────────────────────
@@ -575,10 +614,18 @@ api.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
     case 'GET_CONFIG':
       (async () => {
         const { mal_client_id } = await syncGet('mal_client_id');
+        // identity.getRedirectURL() nicht auf Android verfügbar → try/catch
+        let firefoxRedirect = null;
+        try {
+          if (api.identity && api.identity.getRedirectURL) {
+            firefoxRedirect = api.identity.getRedirectURL();
+          }
+        } catch { /* nicht verfügbar */ }
         sendResponse({
           ok:              true,
           clientId:        mal_client_id ?? '',
-          firefoxRedirect: api.identity.getRedirectURL(),
+          firefoxRedirect,
+          androidRedirect: api.runtime.getURL('options.html'),
         });
       })();
       return true;

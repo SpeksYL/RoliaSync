@@ -237,14 +237,21 @@
     <div class="section">
       <div class="section-title">Redirect URI für MAL API Config</div>
       <p class="hint" style="margin-bottom:14px;">
-        Trage diese URI in deine
+        Trage die passende URI in deine
         <a href="https://myanimelist.net/apiconfig" target="_blank">MAL App-Konfiguration</a>
-        ein (Feld „Redirect URI").
+        ein (Feld „Redirect URI"). MAL erlaubt mehrere URIs – beide eintragen empfohlen.
       </p>
 
-      <div class="uri-row">
+      <div class="uri-label" style="margin-bottom:6px;">Desktop (Firefox)</div>
+      <div class="uri-row" id="uri-firefox-row">
         <span class="uri-value" id="uri-firefox">–</span>
         <button class="btn-copy" data-target="uri-firefox">Kopieren</button>
+      </div>
+
+      <div class="uri-label" style="margin-top:12px; margin-bottom:6px;">Android</div>
+      <div class="uri-row">
+        <span class="uri-value" id="uri-android">–</span>
+        <button class="btn-copy" data-target="uri-android">Kopieren</button>
       </div>
     </div>
 
