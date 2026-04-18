@@ -9,13 +9,14 @@
 const api = browser;
 
 // ─── Konfiguration ────────────────────────────────────────────────────────────
-const MAL_API_BASE        = 'https://api.myanimelist.net/v2';
-const MAL_AUTH_URL        = 'https://myanimelist.net/v1/oauth2/authorize';
-const MAL_TOKEN_URL       = 'https://myanimelist.net/v1/oauth2/token';
-// Redirect URI: wird zur Laufzeit via api.identity.getRedirectURL() ermittelt.
-// Sie ist an die gecko-ID gebunden und bleibt bei signierten Extensions stabil.
-const MAX_HISTORY        = 50;
-const RETRY_DELAY_MS     = 3000;
+const MAL_API_BASE           = 'https://api.myanimelist.net/v2';
+const MAL_AUTH_URL           = 'https://myanimelist.net/v1/oauth2/authorize';
+const MAL_TOKEN_URL          = 'https://myanimelist.net/v1/oauth2/token';
+// Desktop: stabile allizom.org URI via identity.getRedirectURL()
+// Android: externe URI – webNavigation fängt den Redirect ab bevor die Seite lädt
+const ANDROID_REDIRECT_URI   = 'https://roliascan.com/mal-callback';
+const MAX_HISTORY            = 50;
+const RETRY_DELAY_MS         = 3000;
 
 // ─── storage.sync Hilfsfunktionen ────────────────────────────────────────────
 // slugMappings und mal_token liegen in storage.sync (Firefox Sync).
@@ -129,25 +130,39 @@ async function startOAuthFlowDesktop() {
 
 async function startOAuthFlowAndroid() {
   const codeVerifier = generateCodeVerifier();
-  const redirectUri  = api.runtime.getURL('options.html');
 
-  // Redirect URI mitspeichern damit exchangeCodeForToken sie beim Callback kennt
+  // Redirect URI mitspeichern damit exchangeCodeForToken sie beim Token-Austausch kennt
   await api.storage.local.set({
     pkce_verifier:        codeVerifier,
-    android_redirect_uri: redirectUri,
+    android_redirect_uri: ANDROID_REDIRECT_URI,
   });
 
   const authUrl = MAL_AUTH_URL + '?' + new URLSearchParams({
     response_type:         'code',
     client_id:             await getClientId(),
-    redirect_uri:          redirectUri,
+    redirect_uri:          ANDROID_REDIRECT_URI,
     code_challenge:        codeVerifier,
     code_challenge_method: 'plain',
     state:                 crypto.randomUUID(),
   }).toString();
 
-  // Tab öffnen – MAL leitet zu options.html?code=... zurück
-  // options.js erkennt den Code und schickt OAUTH_CODE Message
+  // webNavigation Listener BEVOR Tab geöffnet wird aufsetzen.
+  // Fängt die Navigation zu roliascan.com/mal-callback?code=... ab,
+  // bevor Firefox versucht die Seite zu laden.
+  const listener = (details) => {
+    const match = details.url.match(/[?&]code=([^&]+)/);
+    const code  = match ? match[1] : null;
+    if (!code) return;
+
+    api.webNavigation.onBeforeNavigate.removeListener(listener);
+    api.tabs.remove(details.tabId).catch(() => {});
+    handleOAuthCode(code);
+  };
+
+  api.webNavigation.onBeforeNavigate.addListener(listener, {
+    url: [{ hostEquals: 'roliascan.com', pathPrefix: '/mal-callback' }],
+  });
+
   await api.tabs.create({ url: authUrl });
 }
 
@@ -625,7 +640,7 @@ api.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
           ok:              true,
           clientId:        mal_client_id ?? '',
           firefoxRedirect,
-          androidRedirect: api.runtime.getURL('options.html'),
+          androidRedirect: ANDROID_REDIRECT_URI,
         });
       })();
       return true;
