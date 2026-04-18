@@ -1,9 +1,9 @@
 <!DOCTYPE html>
-<html lang="de">
+<html lang="en">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>RoliaSync – Einstellungen</title>
+  <title>RoliaSync – Settings</title>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -40,7 +40,7 @@
       gap: 28px;
     }
 
-    /* ── Sektionen ── */
+    /* ── Sections ── */
     .section {
       background: #16213e;
       border: 1px solid #263238;
@@ -59,7 +59,7 @@
       border-bottom: 1px solid #1e2a3a;
     }
 
-    /* ── Formular ── */
+    /* ── Form ── */
     label {
       display: block;
       font-size: 12px;
@@ -91,7 +91,7 @@
       line-height: 1.5;
     }
 
-    /* ── Redirect URI Anzeige ── */
+    /* ── Redirect URI display ── */
     .uri-row {
       display: flex;
       gap: 8px;
@@ -149,6 +149,36 @@
     .status-ok    { color: #a5d6a7; }
     .status-err   { color: #ffab91; }
 
+    /* ── Toggle rows ── */
+    .toggle-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 10px 0;
+      border-bottom: 1px solid #1e2a3a;
+    }
+
+    .toggle-row:last-of-type { border-bottom: none; }
+
+    .toggle-label {
+      font-size: 13px;
+      color: #e0e0e0;
+    }
+
+    .toggle-hint {
+      font-size: 11px;
+      color: #546e7a;
+      margin-top: 2px;
+    }
+
+    input[type="checkbox"] {
+      width: 18px;
+      height: 18px;
+      accent-color: #2196f3;
+      cursor: pointer;
+      flex-shrink: 0;
+    }
+
     /* ── Buttons ── */
     .btn {
       padding: 11px 20px;
@@ -165,7 +195,7 @@
     .btn-primary  { background: #2196f3; color: #fff; }
     .btn-row { display: flex; gap: 10px; margin-top: 16px; align-items: center; }
 
-    /* ── Meldungen ── */
+    /* ── Messages ── */
     .msg {
       border-radius: 8px;
       padding: 10px 14px;
@@ -201,84 +231,119 @@
 <body>
 
   <header>
-    <h1>⚙️ RoliaSync – Einstellungen</h1>
-    <p>Konfiguriere deine MyAnimeList API-Zugangsdaten</p>
+    <h1>⚙️ RoliaSync – Settings</h1>
+    <p>Configure your MyAnimeList API credentials</p>
   </header>
 
   <main>
 
-    <!-- MAL Client-ID -->
+    <!-- MAL Client ID -->
     <div class="section">
-      <div class="section-title">MAL Client-ID</div>
+      <div class="section-title">MAL Client ID</div>
 
-      <label for="client-id-input">Client-ID (aus MAL API Config)</label>
+      <label for="client-id-input">Client ID (from MAL API config)</label>
       <input
         type="text"
         id="client-id-input"
-        placeholder="z.B. abc123def456..."
+        placeholder="e.g. abc123def456..."
         spellcheck="false"
         autocomplete="off"
       />
       <p class="hint">
-        Die Client-ID findest du unter
+        Find your Client ID at
         <a href="https://myanimelist.net/apiconfig" target="_blank">myanimelist.net/apiconfig</a>
-        → deine App → Client ID.
-        Sie wird verschlüsselt in deinem Browser gespeichert und über Firefox Sync synchronisiert.
+        → your app → Client ID.
+        It is stored encrypted in your browser and synced via Firefox Sync.
       </p>
 
       <div class="btn-row">
-        <button class="btn btn-primary" id="btn-save">Speichern</button>
+        <button class="btn btn-primary" id="btn-save">Save</button>
       </div>
 
       <div class="msg" id="save-msg"></div>
     </div>
 
-    <!-- Redirect URI (zum Kopieren für MAL) -->
+    <!-- Redirect URIs (copy for MAL) -->
     <div class="section">
-      <div class="section-title">Redirect URI für MAL API Config</div>
+      <div class="section-title">Redirect URI for MAL API config</div>
       <p class="hint" style="margin-bottom:14px;">
-        Trage die passende URI in deine
-        <a href="https://myanimelist.net/apiconfig" target="_blank">MAL App-Konfiguration</a>
-        ein (Feld „Redirect URI"). MAL erlaubt mehrere URIs – beide eintragen empfohlen.
+        Enter the matching URI in your
+        <a href="https://myanimelist.net/apiconfig" target="_blank">MAL app configuration</a>
+        (field "Redirect URI"). MAL allows multiple URIs — adding both is recommended.
       </p>
 
       <div class="uri-label" style="margin-bottom:6px;">Desktop (Firefox)</div>
       <div class="uri-row" id="uri-firefox-row">
         <span class="uri-value" id="uri-firefox">–</span>
-        <button class="btn-copy" data-target="uri-firefox">Kopieren</button>
+        <button class="btn-copy" data-target="uri-firefox">Copy</button>
       </div>
 
       <div class="uri-label" style="margin-top:12px; margin-bottom:6px;">Android</div>
       <div class="uri-row">
         <span class="uri-value" id="uri-android">–</span>
-        <button class="btn-copy" data-target="uri-android">Kopieren</button>
+        <button class="btn-copy" data-target="uri-android">Copy</button>
       </div>
     </div>
 
-    <!-- Login-Status -->
+    <!-- Login status -->
     <div class="section">
-      <div class="section-title">MAL Login-Status</div>
+      <div class="section-title">MAL login status</div>
 
       <div class="status-row">
-        <span class="status-key">Angemeldet als</span>
+        <span class="status-key">Signed in as</span>
         <span class="status-val" id="status-username">–</span>
       </div>
       <div class="status-row">
-        <span class="status-key">Client-ID gespeichert</span>
+        <span class="status-key">Client ID saved</span>
         <span class="status-val" id="status-clientid">–</span>
       </div>
     </div>
 
+    <!-- Notification settings -->
+    <div class="section">
+      <div class="section-title">Notification settings</div>
+
+      <div class="toggle-row">
+        <div>
+          <div class="toggle-label">Browser notifications</div>
+          <div class="toggle-hint">Native notifications (not available on Android)</div>
+        </div>
+        <input type="checkbox" id="notif-browser" checked />
+      </div>
+
+      <div class="toggle-row">
+        <div>
+          <div class="toggle-label">In-page toast</div>
+          <div class="toggle-hint">Small overlay on the manga page (works on Android)</div>
+        </div>
+        <input type="checkbox" id="notif-toast" checked />
+      </div>
+
+      <div class="toggle-row">
+        <div>
+          <div class="toggle-label">Errors only</div>
+          <div class="toggle-hint">Only notify on errors, not on successful syncs</div>
+        </div>
+        <input type="checkbox" id="notif-errors-only" />
+      </div>
+
+      <div class="btn-row">
+        <button class="btn btn-primary" id="btn-save-notif">Save</button>
+      </div>
+
+      <div class="msg" id="notif-msg"></div>
+    </div>
+
     <!-- Links -->
     <div class="section">
-      <div class="section-title">Nützliche Links</div>
+      <div class="section-title">Useful links</div>
       <div class="link-row">
         <span>🔧</span>
-        <a href="https://myanimelist.net/apiconfig" target="_blank">MAL API Config – App verwalten</a>
+        <a href="https://myanimelist.net/apiconfig" target="_blank">MAL API config — manage your app</a>
       </div>
       <div class="link-row">
         <span>📋</span>
-        <a href="https://myanimelist.net/apiconfig/references/api/v2" target="_blank">MAL API Dokumentation (v2)</a>
+        <a href="https://myanimelist.net/apiconfig/references/api/v2" target="_blank">MAL API documentation (v2)</a>
       </div>
     </div>
 

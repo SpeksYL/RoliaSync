@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="de">
+<html lang="en">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
@@ -52,7 +52,7 @@
       padding: 16px;
     }
 
-    /* ── Nicht eingeloggt ── */
+    /* ── Logged out ── */
     #view-loggedout {
       text-align: center;
     }
@@ -64,7 +64,7 @@
       line-height: 1.5;
     }
 
-    /* ── Eingeloggt ── */
+    /* ── Logged in ── */
     #view-loggedin {
       display: none;
     }
@@ -168,7 +168,7 @@
 
     @keyframes spin { to { transform: rotate(360deg); } }
 
-    /* ── Fehlermeldung ── */
+    /* ── Error message ── */
     #error-msg {
       display: none;
       background: #4e342e;
@@ -200,32 +200,32 @@
     <img src="icons/icon48.png" alt="Logo" id="header-logo" />
     <div>
       <h1>RoliaSync</h1>
-      <span>Manga-Sync</span>
+      <span>Manga sync</span>
     </div>
   </header>
 
   <main>
 
-    <!-- Ladezustand -->
+    <!-- Loading -->
     <div id="loading">
       <div class="spinner"></div>
-      <div>Lade Status …</div>
+      <div>Loading…</div>
     </div>
 
-    <!-- Nicht eingeloggt -->
+    <!-- Logged out -->
     <div id="view-loggedout" style="display:none;">
-      <p>Melde dich mit deinem MyAnimeList-Konto an, um gelesene Chapter automatisch zu syncen.</p>
-      <button class="btn btn-primary" id="btn-login">🔑 Mit MAL anmelden</button>
+      <p>Sign in with your MyAnimeList account to automatically sync read chapters.</p>
+      <button class="btn btn-primary" id="btn-login">🔑 Sign in with MAL</button>
     </div>
 
-    <!-- Eingeloggt -->
+    <!-- Logged in -->
     <div id="view-loggedin" style="display:none;">
       <div class="info-row">
-        <span class="info-label">Konto</span>
+        <span class="info-label">Account</span>
         <span class="info-value" id="username">–</span>
       </div>
       <div class="info-row">
-        <span class="info-label">Letzter Sync</span>
+        <span class="info-label">Last sync</span>
         <span class="info-value" id="last-sync-title">–</span>
       </div>
       <div class="info-row">
@@ -235,16 +235,16 @@
       <div class="info-row">
         <span class="info-label">Status</span>
         <span class="info-value" id="last-sync-status">
-          <span class="status-badge status-none">Kein Sync</span>
+          <span class="status-badge status-none">No sync yet</span>
         </span>
       </div>
       <div class="info-row">
-        <span class="info-label">Zeitpunkt</span>
+        <span class="info-label">Time</span>
         <span class="info-value" id="last-sync-time">–</span>
       </div>
 
-      <button class="btn btn-secondary" id="btn-history">📋 Verlauf öffnen</button>
-      <button class="btn btn-danger" id="btn-logout">Abmelden</button>
+      <button class="btn btn-secondary" id="btn-history">📋 Open history</button>
+      <button class="btn btn-danger" id="btn-logout">Sign out</button>
     </div>
 
     <div id="error-msg"></div>

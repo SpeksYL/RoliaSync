@@ -1,9 +1,9 @@
 <!DOCTYPE html>
-<html lang="de">
+<html lang="en">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>RoliaSync – Verlauf</title>
+  <title>RoliaSync – Sync History</title>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -54,14 +54,14 @@
       border-radius: 12px;
     }
 
-    /* ── Hauptbereich ── */
+    /* ── Main area ── */
     main {
       max-width: 900px;
       margin: 0 auto;
       padding: 24px 16px;
     }
 
-    /* ── Leerer Zustand ── */
+    /* ── Empty state ── */
     #empty-state {
       display: none;
       text-align: center;
@@ -79,7 +79,7 @@
       line-height: 1.6;
     }
 
-    /* ── Tabelle ── */
+    /* ── Table ── */
     .table-wrapper {
       overflow-x: auto;
       -webkit-overflow-scrolling: touch;
@@ -93,7 +93,7 @@
       main { padding: 16px 10px; }
       th, td { padding: 10px 10px; }
       .td-title { max-width: 140px; }
-      /* Zeitpunkt-Spalte ausblenden */
+      /* Hide time column on small screens */
       .td-time, thead th:nth-child(3) { display: none; }
     }
 
@@ -132,7 +132,7 @@
       vertical-align: middle;
     }
 
-    /* Titel-Spalte */
+    /* Title column */
     .td-title {
       font-weight: 600;
       color: #fff;
@@ -146,20 +146,20 @@
       margin-top: 2px;
     }
 
-    /* Chapter-Spalte */
+    /* Chapter column */
     .td-chapter {
       color: #90caf9;
       font-weight: 600;
       white-space: nowrap;
     }
 
-    /* Zeit-Spalte */
+    /* Time column */
     .td-time {
       color: #9e9e9e;
       white-space: nowrap;
     }
 
-    /* Status-Spalte */
+    /* Status column */
     .status-badge {
       display: inline-flex;
       align-items: center;
@@ -213,7 +213,7 @@
     .btn-force-sync:hover { opacity: 0.75; }
     .btn-force-sync:disabled { opacity: 0.4; cursor: not-allowed; }
 
-    /* Tooltip für Fehlermeldung */
+    /* Tooltip for error message */
     [data-tooltip] {
       position: relative;
     }
@@ -237,7 +237,7 @@
       line-height: 1.4;
     }
 
-    /* ── Ladeindikator ── */
+    /* ── Loading indicator ── */
     #loading {
       text-align: center;
       padding: 48px;
@@ -257,7 +257,7 @@
 
     @keyframes spin { to { transform: rotate(360deg); } }
 
-    /* ── Button ── */
+    /* ── Clear button ── */
     .btn-clear {
       display: inline-block;
       margin-top: 16px;
@@ -279,35 +279,35 @@
   <header>
     <div class="header-left">
       <div>
-        <h1>Sync-Verlauf</h1>
+        <h1>Sync History</h1>
         <span class="subtitle">roliascan.com → MyAnimeList</span>
       </div>
     </div>
-    <span id="entry-count">Lade …</span>
+    <span id="entry-count">Loading…</span>
   </header>
 
   <main>
-    <!-- Ladeindikator -->
+    <!-- Loading indicator -->
     <div id="loading">
       <div class="spinner"></div>
-      <div>Lade Verlauf …</div>
+      <div>Loading history…</div>
     </div>
 
-    <!-- Leerer Zustand -->
+    <!-- Empty state -->
     <div id="empty-state">
       <div class="icon">📭</div>
-      <p>Noch keine Syncs vorhanden.<br>
-         Öffne ein Chapter auf roliascan.com, um den ersten Sync zu starten.</p>
+      <p>No syncs yet.<br>
+         Open a chapter on roliascan.com to start your first sync.</p>
     </div>
 
-    <!-- Tabelle -->
+    <!-- Table -->
     <div class="table-wrapper" id="table-wrapper" style="display:none;">
       <table>
         <thead>
           <tr>
-            <th>Manga-Titel (MAL)</th>
+            <th>Manga title (MAL)</th>
             <th>Chapter</th>
-            <th>Zeitpunkt</th>
+            <th>Time</th>
             <th>Status</th>
           </tr>
         </thead>
@@ -316,7 +316,7 @@
     </div>
 
     <div style="text-align:right; margin-top:12px;" id="clear-area" style="display:none;">
-      <button class="btn-clear" id="btn-clear">Verlauf löschen</button>
+      <button class="btn-clear" id="btn-clear">Clear history</button>
     </div>
   </main>
 

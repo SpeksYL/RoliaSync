@@ -1,11 +1,10 @@
 /**
- * history.js — Verlaufsseite
- * Lädt alle Sync-Einträge aus chrome.storage und rendert sie als Tabelle.
+ * history.js — Sync history page
+ * Loads sync entries from storage and renders them as a table.
  */
 
 'use strict';
 
-// ─── Browser-API Polyfill ─────────────────────────────────────────────────────
 const api = typeof browser !== 'undefined' ? browser : chrome;
 
 const loadingEl     = document.getElementById('loading');
@@ -16,7 +15,7 @@ const entryCountEl  = document.getElementById('entry-count');
 const clearArea     = document.getElementById('clear-area');
 const btnClear      = document.getElementById('btn-clear');
 
-// ─── Hilfsfunktionen ──────────────────────────────────────────────────────────
+// ─── Helpers ──────────────────────────────────────────────────────────────────
 
 function relativeTime(timestamp) {
   if (!timestamp) return '–';
@@ -25,20 +24,20 @@ function relativeTime(timestamp) {
   const h    = Math.floor(diff / 3_600_000);
   const d    = Math.floor(diff / 86_400_000);
 
-  if (min <  1)  return 'gerade eben';
-  if (min <  60) return `vor ${min} Min`;
-  if (h   <  24) return `vor ${h} Std`;
-  if (d   === 1) return 'gestern';
-  if (d   <  30) return `vor ${d} Tagen`;
-  return new Date(timestamp).toLocaleDateString('de-DE', {
-    day: '2-digit', month: '2-digit', year: 'numeric',
+  if (min <  1)  return 'just now';
+  if (min <  60) return `${min}m ago`;
+  if (h   <  24) return `${h}h ago`;
+  if (d   === 1) return 'yesterday';
+  if (d   <  30) return `${d}d ago`;
+  return new Date(timestamp).toLocaleDateString('en-US', {
+    month: '2-digit', day: '2-digit', year: 'numeric',
   });
 }
 
 function absoluteTime(timestamp) {
   if (!timestamp) return '';
-  return new Date(timestamp).toLocaleString('de-DE', {
-    day: '2-digit', month: '2-digit', year: 'numeric',
+  return new Date(timestamp).toLocaleString('en-US', {
+    month: '2-digit', day: '2-digit', year: 'numeric',
     hour: '2-digit', minute: '2-digit',
   });
 }
@@ -49,27 +48,27 @@ function buildStatusCell(entry, td) {
 
   if (entry.status === 'success') {
     badge.classList.add('status-success');
-    badge.textContent = '✅ Erfolgreich';
+    badge.textContent = '✅ Success';
   } else if (entry.status === 'error') {
     badge.classList.add('status-error');
-    badge.textContent = '⚠️ Fehler';
-    const msg = entry.errorMsg ?? 'Unbekannter Fehler';
+    badge.textContent = '⚠️ Error';
+    const msg = entry.errorMsg ?? 'Unknown error';
     badge.title = msg;
     badge.dataset.tooltip = msg;
   } else if (entry.status === 'not_found') {
     badge.classList.add('status-not-found');
-    badge.textContent = '🔍 Nicht gefunden';
-    const msg = entry.errorMsg ?? 'Nicht auf MAL gefunden';
+    badge.textContent = '🔍 Not found';
+    const msg = entry.errorMsg ?? 'Not found on MAL';
     badge.title = msg;
     badge.dataset.tooltip = msg;
   } else if (entry.status === 'skipped') {
     badge.classList.add('status-skipped');
-    badge.textContent = '⏭️ Übersprungen';
+    badge.textContent = '⏭️ Skipped';
     if (entry.errorMsg) badge.title = entry.errorMsg;
     if (entry.malId) {
       const btn = document.createElement('button');
       btn.className        = 'btn-force-sync';
-      btn.textContent      = '🔄 Trotzdem syncen';
+      btn.textContent      = '🔄 Force sync';
       btn.dataset.manga    = entry.manga    ?? '';
       btn.dataset.chapter  = String(entry.chapter ?? '');
       btn.dataset.malid    = String(entry.malId);
@@ -80,7 +79,7 @@ function buildStatusCell(entry, td) {
     }
   } else {
     badge.classList.add('status-pending');
-    badge.textContent = '⏳ Ausstehend';
+    badge.textContent = '⏳ Pending';
   }
 
   td.appendChild(badge);
@@ -98,30 +97,30 @@ function sendMsg(type, payload = {}) {
   });
 }
 
-// ─── Tabelle rendern ──────────────────────────────────────────────────────────
+// ─── Render table ─────────────────────────────────────────────────────────────
 
 function renderHistory(history) {
   loadingEl.style.display = 'none';
 
   if (!history || history.length === 0) {
     emptyStateEl.style.display = 'block';
-    entryCountEl.textContent   = '0 Einträge';
+    entryCountEl.textContent   = '0 entries';
     clearArea.style.display    = 'none';
     return;
   }
 
-  entryCountEl.textContent  = `${history.length} Einträge`;
+  entryCountEl.textContent   = `${history.length} entries`;
   tableWrapper.style.display = 'block';
   clearArea.style.display    = 'block';
 
   historyBody.textContent = '';
   history.forEach(entry => {
-    const title   = entry.malTitle ?? entry.manga ?? '–';
-    const slug    = entry.manga ?? '';
+    const title = entry.malTitle ?? entry.manga ?? '–';
+    const slug  = entry.manga ?? '';
 
     const tr = document.createElement('tr');
 
-    // Titel
+    // Title
     const tdTitle = document.createElement('td');
     tdTitle.className   = 'td-title';
     tdTitle.textContent = title;
@@ -137,7 +136,7 @@ function renderHistory(history) {
     tdChapter.className   = 'td-chapter';
     tdChapter.textContent = `Ch. ${entry.chapter ?? '–'}`;
 
-    // Zeit
+    // Time
     const tdTime = document.createElement('td');
     tdTime.className   = 'td-time';
     tdTime.title       = absoluteTime(entry.timestamp);
@@ -160,34 +159,30 @@ function renderHistory(history) {
 async function init() {
   try {
     const res = await sendMsg('GET_HISTORY');
-    if (!res.ok) throw new Error(res.error ?? 'Verlauf konnte nicht geladen werden');
+    if (!res.ok) throw new Error(res.error ?? 'Failed to load history');
     renderHistory(res.history);
   } catch (err) {
     loadingEl.style.display = 'none';
     emptyStateEl.style.display = 'block';
-    emptyStateEl.querySelector('p').textContent =
-      `Fehler beim Laden: ${err.message}`;
+    emptyStateEl.querySelector('p').textContent = `Failed to load: ${err.message}`;
   }
 }
 
-// ─── Verlauf löschen ──────────────────────────────────────────────────────────
+// ─── Clear history ────────────────────────────────────────────────────────────
 
 btnClear.addEventListener('click', async () => {
-  if (!confirm('Gesamten Sync-Verlauf löschen? Diese Aktion kann nicht rückgängig gemacht werden.')) {
-    return;
-  }
+  if (!confirm('Delete entire sync history? This cannot be undone.')) return;
 
   await api.storage.local.remove(['sync_history', 'last_sync']);
 
-  // UI zurücksetzen
-  historyBody.innerHTML      = '';
+  historyBody.textContent    = '';
   tableWrapper.style.display = 'none';
   clearArea.style.display    = 'none';
   emptyStateEl.style.display = 'block';
-  entryCountEl.textContent   = '0 Einträge';
+  entryCountEl.textContent   = '0 entries';
 });
 
-// ─── Force-Sync ───────────────────────────────────────────────────────────────
+// ─── Force sync ───────────────────────────────────────────────────────────────
 
 historyBody.addEventListener('click', async (e) => {
   const btn = e.target.closest('.btn-force-sync');
@@ -203,21 +198,20 @@ historyBody.addEventListener('click', async (e) => {
 
   try {
     const res = await sendMsg('FORCE_SYNC', { manga, chapter, malId, malTitle });
-    if (!res.ok) throw new Error(res.error ?? 'Sync fehlgeschlagen');
-    btn.textContent = '✅ Gesynct';
-    // Zeile als gesynct markieren
+    if (!res.ok) throw new Error(res.error ?? 'Sync failed');
+    btn.textContent = '✅ Synced';
     const badge = btn.previousElementSibling;
     if (badge) {
       badge.className   = 'status-badge status-success';
-      badge.textContent = '✅ Erfolgreich';
+      badge.textContent = '✅ Success';
     }
     btn.remove();
   } catch (err) {
     btn.disabled    = false;
-    btn.textContent = '🔄 Trotzdem syncen';
-    alert(`Fehler: ${err.message}`);
+    btn.textContent = '🔄 Force sync';
+    alert(`Error: ${err.message}`);
   }
 });
 
-// Starten
+// Start
 init();

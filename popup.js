@@ -1,14 +1,13 @@
 /**
- * popup.js — Popup UI Logik
- * Zeigt Login-Button (ausgeloggt) oder Status + Verlauf-Button (eingeloggt).
+ * popup.js — Popup UI
+ * Shows login button (logged out) or status + history button (logged in).
  */
 
 'use strict';
 
-// ─── Browser-API Polyfill ─────────────────────────────────────────────────────
 const api = typeof browser !== 'undefined' ? browser : chrome;
 
-// ─── DOM-Referenzen ───────────────────────────────────────────────────────────
+// ─── DOM refs ─────────────────────────────────────────────────────────────────
 const loading          = document.getElementById('loading');
 const viewLoggedout    = document.getElementById('view-loggedout');
 const viewLoggedin     = document.getElementById('view-loggedin');
@@ -23,17 +22,16 @@ const lastTimeEl       = document.getElementById('last-sync-time');
 const errorMsgEl       = document.getElementById('error-msg');
 const headerLogo       = document.getElementById('header-logo');
 
-// Logo ausblenden falls nicht ladbar (CSP-sicher, kein onerror-Attribut)
+// Hide logo if it fails to load (CSP-safe, no onerror attribute)
 if (headerLogo) {
   headerLogo.addEventListener('error', () => { headerLogo.style.display = 'none'; });
 }
 
-// ─── Hilfsfunktionen ──────────────────────────────────────────────────────────
+// ─── Helpers ──────────────────────────────────────────────────────────────────
 
 function showError(msg) {
-  errorMsgEl.textContent    = msg;
-  errorMsgEl.style.display  = 'block';
-  errorMsgEl.style.background = '';  // Standard-Fehlerfarbe (aus CSS)
+  errorMsgEl.textContent   = msg;
+  errorMsgEl.style.display = 'block';
 }
 
 function clearError() {
@@ -48,12 +46,12 @@ function relativeTime(timestamp) {
   const h    = Math.floor(diff / 3_600_000);
   const d    = Math.floor(diff / 86_400_000);
 
-  if (min <  1)  return 'gerade eben';
-  if (min <  60) return `vor ${min} Min`;
-  if (h   <  24) return `vor ${h} Std`;
-  if (d   === 1) return 'gestern';
-  if (d   <  30) return `vor ${d} Tagen`;
-  return new Date(timestamp).toLocaleDateString('de-DE');
+  if (min <  1)  return 'just now';
+  if (min <  60) return `${min}m ago`;
+  if (h   <  24) return `${h}h ago`;
+  if (d   === 1) return 'yesterday';
+  if (d   <  30) return `${d}d ago`;
+  return new Date(timestamp).toLocaleDateString('en-US');
 }
 
 function setStatusBadge(el, status) {
@@ -61,17 +59,20 @@ function setStatusBadge(el, status) {
   const span = document.createElement('span');
   span.className = 'status-badge ';
   if (status === 'success') {
-    span.className += 'status-success';
-    span.textContent = '✅ Erfolgreich';
+    span.className  += 'status-success';
+    span.textContent = '✅ Success';
   } else if (status === 'error') {
-    span.className += 'status-error';
-    span.textContent = '⚠️ Fehler';
+    span.className  += 'status-error';
+    span.textContent = '⚠️ Error';
   } else if (status === 'not_found') {
-    span.className += 'status-none';
-    span.textContent = '🔍 Nicht gefunden';
+    span.className  += 'status-none';
+    span.textContent = '🔍 Not found';
+  } else if (status === 'skipped') {
+    span.className  += 'status-none';
+    span.textContent = '⏭️ Skipped';
   } else {
-    span.className += 'status-none';
-    span.textContent = 'Ausstehend';
+    span.className  += 'status-none';
+    span.textContent = 'Pending';
   }
   el.appendChild(span);
 }
@@ -88,7 +89,7 @@ function sendMsg(type, payload = {}) {
   });
 }
 
-// ─── UI-Zustand setzen ────────────────────────────────────────────────────────
+// ─── UI state ─────────────────────────────────────────────────────────────────
 
 function showLoggedout() {
   loading.style.display       = 'none';
@@ -117,7 +118,7 @@ async function init() {
   clearError();
   try {
     const res = await sendMsg('GET_STATUS');
-    if (!res.ok) throw new Error(res.error ?? 'Statusabfrage fehlgeschlagen');
+    if (!res.ok) throw new Error(res.error ?? 'Status check failed');
 
     if (res.loggedIn) {
       showLoggedin(res.username, res.lastEntry);
@@ -126,25 +127,25 @@ async function init() {
     }
   } catch (err) {
     loading.style.display = 'none';
-    showError(`Fehler: ${err.message}`);
+    showError(`Error: ${err.message}`);
   }
 }
 
-// ─── Event-Handler ────────────────────────────────────────────────────────────
+// ─── Event handlers ───────────────────────────────────────────────────────────
 
 btnLogin.addEventListener('click', async () => {
   clearError();
   btnLogin.disabled    = true;
-  btnLogin.textContent = 'Anmeldung läuft …';
+  btnLogin.textContent = 'Signing in…';
 
   try {
     const res = await sendMsg('START_LOGIN');
-    if (!res.ok) throw new Error(res.error ?? 'Login fehlgeschlagen');
+    if (!res.ok) throw new Error(res.error ?? 'Login failed');
     await init();
   } catch (err) {
-    showError(`Anmeldung fehlgeschlagen: ${err.message}`);
+    showError(`Sign in failed: ${err.message}`);
     btnLogin.disabled    = false;
-    btnLogin.textContent = '🔑 Mit MAL anmelden';
+    btnLogin.textContent = '🔑 Sign in with MAL';
   }
 });
 
@@ -154,7 +155,7 @@ btnLogout.addEventListener('click', async () => {
     await sendMsg('LOGOUT');
     showLoggedout();
   } catch (err) {
-    showError(`Abmeldung fehlgeschlagen: ${err.message}`);
+    showError(`Sign out failed: ${err.message}`);
   }
 });
 
@@ -163,5 +164,5 @@ btnHistory.addEventListener('click', () => {
   window.close();
 });
 
-// Starten
+// Start
 init();

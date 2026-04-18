@@ -1,0 +1,9 @@
+{
+  "categories": {
+    "firefox": ["other"],
+    "android": ["other"]
+  },
+  "version": {
+    "license": "MIT"
+  }
+}

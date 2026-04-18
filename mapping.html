@@ -1,9 +1,9 @@
 <!DOCTYPE html>
-<html lang="de">
+<html lang="en">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>RoliaSync – Manga-Zuordnung</title>
+  <title>RoliaSync – Manga Assignment</title>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -36,14 +36,14 @@
       margin-top: 4px;
     }
 
-    /* ── Hauptbereich ── */
+    /* ── Main area ── */
     main {
       max-width: 680px;
       margin: 0 auto;
       padding: 28px 16px;
     }
 
-    /* ── Info-Box ── */
+    /* ── Info box ── */
     .info-box {
       background: #1e2a3a;
       border: 1px solid #37474f;
@@ -76,7 +76,7 @@
       line-height: 1.5;
     }
 
-    /* ── Suche ── */
+    /* ── Search ── */
     .search-section label {
       display: block;
       font-size: 12px;
@@ -140,7 +140,7 @@
     .btn-primary { background: #2196f3; color: #fff; }
     .btn-success { background: #2e7d32; color: #fff; }
 
-    /* ── Suchergebnisse ── */
+    /* ── Search results ── */
     #results-section {
       margin-top: 20px;
       display: none;
@@ -196,7 +196,7 @@
       font-family: 'Courier New', monospace;
     }
 
-    /* ── Aktions-Bereich ── */
+    /* ── Action area ── */
     #action-section {
       margin-top: 20px;
       display: none;
@@ -223,7 +223,7 @@
       color: #546e7a;
     }
 
-    /* ── Status-Meldungen ── */
+    /* ── Status messages ── */
     .msg {
       border-radius: 8px;
       padding: 10px 14px;
@@ -251,7 +251,7 @@
 
     @keyframes spin { to { transform: rotate(360deg); } }
 
-    /* ── Leerer Zustand ── */
+    /* ── Empty results ── */
     .empty-results {
       text-align: center;
       padding: 24px;
@@ -263,60 +263,60 @@
 <body>
 
   <header>
-    <h1>⚠️ Manga manuell zuweisen</h1>
-    <p>Dieser Manga wurde nicht automatisch auf MAL gefunden</p>
+    <h1>⚠️ Assign manga manually</h1>
+    <p>This manga was not found automatically on MAL</p>
   </header>
 
   <main>
 
-    <!-- Info: welcher Slug wurde nicht gefunden -->
+    <!-- Info: which slug was not found -->
     <div class="info-box">
-      <div class="label">Nicht gefundener Slug</div>
+      <div class="label">Unmatched slug</div>
       <div class="slug" id="display-slug">–</div>
       <div class="hint">
-        Suche nach dem Manga-Titel auf MyAnimeList und weise ihn diesem Slug zu.
-        Die Zuordnung wird lokal gespeichert und bei zukünftigen Syncs automatisch verwendet.
+        Search for the manga title on MyAnimeList and assign it to this slug.
+        The mapping is saved locally and used automatically for future syncs.
       </div>
     </div>
 
-    <!-- Suchfeld -->
+    <!-- Search field -->
     <div class="search-section">
-      <label for="search-input">Auf MAL suchen</label>
+      <label for="search-input">Search on MAL</label>
       <div class="search-row">
         <input
           type="text"
           id="search-input"
-          placeholder="z.B. Spy x Family"
+          placeholder="e.g. Spy x Family"
           autocomplete="off"
         />
-        <button class="btn btn-search" id="btn-search">Suchen</button>
+        <button class="btn btn-search" id="btn-search">Search</button>
       </div>
     </div>
 
-    <!-- Ergebnisliste -->
+    <!-- Results list -->
     <div id="results-section">
-      <h2>Suchergebnisse – Titel auswählen</h2>
+      <h2>Results — select a title</h2>
       <ul id="results-list"></ul>
       <div class="empty-results" id="empty-results" style="display:none;">
-        Keine Ergebnisse gefunden. Versuche einen anderen Suchbegriff.
+        No results found. Try a different search term.
       </div>
     </div>
 
-    <!-- Zuweisen-Button -->
+    <!-- Assign button -->
     <div id="action-section">
       <div class="selected-preview">
         <div>
           <div class="preview-title" id="preview-title">–</div>
-          <div class="preview-id" id="preview-id">MAL-ID: –</div>
+          <div class="preview-id" id="preview-id">MAL ID: –</div>
         </div>
         <span style="color:#2e7d32; font-size:20px;">✓</span>
       </div>
       <button class="btn btn-success" id="btn-assign" style="width:100%;">
-        Zuweisen &amp; Speichern
+        Assign &amp; Save
       </button>
     </div>
 
-    <!-- Status-Meldungen -->
+    <!-- Status messages -->
     <div id="status-msg" style="display:none;"></div>
 
   </main>

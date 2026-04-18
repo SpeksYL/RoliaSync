@@ -1,18 +1,17 @@
 /**
- * mapping.js — Manuelle Slug-Zuweisung
- * Ermöglicht die manuelle Verknüpfung eines Roliascan-Slugs mit einem MAL-Manga.
+ * mapping.js — Manual slug assignment
+ * Allows manually linking a roliascan slug to a MAL manga.
  */
 
 'use strict';
 
-// ─── Browser-API Polyfill ─────────────────────────────────────────────────────
 const api = typeof browser !== 'undefined' ? browser : chrome;
 
-// ─── URL-Parameter ────────────────────────────────────────────────────────────
+// ─── URL params ───────────────────────────────────────────────────────────────
 const params      = new URLSearchParams(window.location.search);
 const currentSlug = params.get('slug') ?? '';
 
-// ─── DOM-Referenzen ───────────────────────────────────────────────────────────
+// ─── DOM refs ─────────────────────────────────────────────────────────────────
 const displaySlugEl  = document.getElementById('display-slug');
 const searchInput    = document.getElementById('search-input');
 const btnSearch      = document.getElementById('btn-search');
@@ -25,7 +24,7 @@ const previewId      = document.getElementById('preview-id');
 const btnAssign      = document.getElementById('btn-assign');
 const statusMsg      = document.getElementById('status-msg');
 
-// ─── Zustand ──────────────────────────────────────────────────────────────────
+// ─── State ────────────────────────────────────────────────────────────────────
 let selectedMalId    = null;
 let selectedMalTitle = null;
 
@@ -33,15 +32,15 @@ let selectedMalTitle = null;
 
 if (currentSlug) {
   displaySlugEl.textContent = currentSlug;
-  // Suchfeld vorausfüllen (Slug → lesbarer Titel)
+  // Pre-fill search with slug converted to readable title
   searchInput.value = currentSlug.replace(/-/g, ' ');
 } else {
-  displaySlugEl.textContent = '(kein Slug angegeben)';
-  showStatus('error', 'Kein Manga-Slug in der URL gefunden. Bitte diese Seite über eine Notification öffnen.');
+  displaySlugEl.textContent = '(no slug provided)';
+  showStatus('error', 'No manga slug found in URL. Please open this page via a notification.');
   btnSearch.disabled = true;
 }
 
-// ─── Hilfsfunktionen ──────────────────────────────────────────────────────────
+// ─── Helpers ──────────────────────────────────────────────────────────────────
 
 function sendMsg(type, payload = {}) {
   return new Promise((resolve, reject) => {
@@ -71,11 +70,11 @@ function setSearchLoading(loading) {
     const spinner = document.createElement('span');
     spinner.className = 'spinner-inline';
     btnSearch.appendChild(spinner);
-    btnSearch.appendChild(document.createTextNode('Suche …'));
+    btnSearch.appendChild(document.createTextNode('Searching…'));
     btnSearch.disabled   = true;
     searchInput.disabled = true;
   } else {
-    btnSearch.textContent = 'Suchen';
+    btnSearch.textContent = 'Search';
     btnSearch.disabled    = false;
     searchInput.disabled  = false;
   }
@@ -85,22 +84,20 @@ function selectResult(id, title) {
   selectedMalId    = id;
   selectedMalTitle = title;
 
-  // Markierung in Liste aktualisieren
   document.querySelectorAll('#results-list li').forEach(li => {
     li.classList.toggle('selected', li.dataset.malId === String(id));
   });
 
-  // Vorschau anzeigen
   previewTitle.textContent    = title;
-  previewId.textContent       = `MAL-ID: ${id}`;
+  previewId.textContent       = `MAL ID: ${id}`;
   actionSection.style.display = 'block';
   hideStatus();
 }
 
-// ─── Suchergebnisse rendern ───────────────────────────────────────────────────
+// ─── Render results ───────────────────────────────────────────────────────────
 
 function renderResults(results) {
-  resultsList.innerHTML = '';
+  resultsList.textContent    = '';
   emptyResults.style.display = 'none';
   resultsSection.style.display = 'block';
 
@@ -127,7 +124,7 @@ function renderResults(results) {
   });
 }
 
-// ─── Suche ausführen ──────────────────────────────────────────────────────────
+// ─── Search ───────────────────────────────────────────────────────────────────
 
 async function doSearch() {
   const query = searchInput.value.trim();
@@ -142,26 +139,26 @@ async function doSearch() {
 
   try {
     const res = await sendMsg('SEARCH_MAL', { query });
-    if (!res.ok) throw new Error(res.error ?? 'Suche fehlgeschlagen');
+    if (!res.ok) throw new Error(res.error ?? 'Search failed');
     renderResults(res.results);
   } catch (err) {
-    showStatus('error', `Fehler bei der Suche: ${err.message}`);
+    showStatus('error', `Search error: ${err.message}`);
     resultsSection.style.display = 'none';
   } finally {
     setSearchLoading(false);
   }
 }
 
-// ─── Zuweisung speichern ──────────────────────────────────────────────────────
+// ─── Assign ───────────────────────────────────────────────────────────────────
 
 async function doAssign() {
   if (!selectedMalId || !selectedMalTitle || !currentSlug) return;
 
   btnAssign.textContent = '';
-  const assignSpinner = document.createElement('span');
-  assignSpinner.className = 'spinner-inline';
-  btnAssign.appendChild(assignSpinner);
-  btnAssign.appendChild(document.createTextNode('Speichern …'));
+  const spinner = document.createElement('span');
+  spinner.className = 'spinner-inline';
+  btnAssign.appendChild(spinner);
+  btnAssign.appendChild(document.createTextNode('Saving…'));
   btnAssign.disabled = true;
 
   try {
@@ -171,25 +168,24 @@ async function doAssign() {
       malTitle: selectedMalTitle,
     });
 
-    if (!res.ok) throw new Error(res.error ?? 'Speichern fehlgeschlagen');
+    if (!res.ok) throw new Error(res.error ?? 'Save failed');
 
     showStatus('success',
-      `✅ Zugewiesen: „${selectedMalTitle}" (ID ${selectedMalId}) → ${currentSlug}\n` +
-      `Der ausstehende Sync wird jetzt automatisch wiederholt.`
+      `✅ Assigned: "${selectedMalTitle}" (ID ${selectedMalId}) → ${currentSlug}\n` +
+      `The pending sync will now be retried automatically.`
     );
 
-    btnAssign.textContent = '✅ Gespeichert';
-    // Seite nach kurzer Verzögerung schließen
+    btnAssign.textContent = '✅ Saved';
     setTimeout(() => window.close(), 2500);
 
   } catch (err) {
-    showStatus('error', `Fehler beim Speichern: ${err.message}`);
-    btnAssign.textContent = 'Zuweisen & Speichern';
-    btnAssign.disabled  = false;
+    showStatus('error', `Error saving: ${err.message}`);
+    btnAssign.textContent = 'Assign & Save';
+    btnAssign.disabled    = false;
   }
 }
 
-// ─── Event-Handler ────────────────────────────────────────────────────────────
+// ─── Event handlers ───────────────────────────────────────────────────────────
 
 btnSearch.addEventListener('click', doSearch);
 
