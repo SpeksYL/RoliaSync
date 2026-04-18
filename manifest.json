@@ -1,7 +1,7 @@
 {
   "manifest_version": 2,
   "name": "RoliaSync",
-  "version": "1.2.1",
+  "version": "1.2.3",
   "description": "Synct gelesene Manga-Chapter von roliascan.com auf MyAnimeList.",
 
   "browser_specific_settings": {

@@ -146,22 +146,47 @@ async function startOAuthFlowAndroid() {
     state:                 crypto.randomUUID(),
   }).toString();
 
-  // webNavigation Listener BEVOR Tab geöffnet wird aufsetzen.
-  // Fängt die Navigation zu roliascan.com/mal-callback?code=... ab,
-  // bevor Firefox versucht die Seite zu laden.
-  const listener = (details) => {
-    const match = details.url.match(/[?&]code=([^&]+)/);
+  // Beide Listener gleichzeitig – webNavigation ist schneller, tabs.onUpdated Fallback.
+  // Listener VOR dem Tab-Öffnen registrieren damit kein Event verpasst wird.
+
+  let handled = false;
+
+  function cleanup(tabId) {
+    api.webNavigation.onBeforeNavigate.removeListener(navListener);
+    api.tabs.onUpdated.removeListener(tabListener);
+    if (tabId) api.tabs.remove(tabId).catch(() => {});
+  }
+
+  function extractAndHandle(url, tabId) {
+    if (handled) return;
+    const match = url.match(/[?&]code=([^&]+)/);
     const code  = match ? match[1] : null;
     if (!code) return;
-
-    api.webNavigation.onBeforeNavigate.removeListener(listener);
-    api.tabs.remove(details.tabId).catch(() => {});
+    handled = true;
+    cleanup(tabId);
     handleOAuthCode(code);
+  }
+
+  // Listener 1: webNavigation (schneller, fängt Navigation vor dem Laden ab)
+  const navListener = (details) => {
+    if (details.url.includes('mal-callback') || details.url.includes('code=')) {
+      extractAndHandle(details.url, details.tabId);
+    }
   };
 
-  api.webNavigation.onBeforeNavigate.addListener(listener, {
-    url: [{ hostEquals: 'roliascan.com', pathPrefix: '/mal-callback' }],
+  api.webNavigation.onBeforeNavigate.addListener(navListener, {
+    url: [{ urlContains: 'roliascan.com' }],
   });
+
+  // Listener 2: tabs.onUpdated (Fallback falls webNavigation zu spät feuert)
+  const tabListener = (tabId, changeInfo) => {
+    if (changeInfo.url &&
+        (changeInfo.url.includes('mal-callback') || changeInfo.url.includes('code='))) {
+      extractAndHandle(changeInfo.url, tabId);
+    }
+  };
+
+  api.tabs.onUpdated.addListener(tabListener);
 
   await api.tabs.create({ url: authUrl });
 }
