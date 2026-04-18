@@ -14,33 +14,76 @@
       min-height: 100vh;
     }
 
+    /* ── Header ── */
     header {
       background: #16213e;
-      padding: 20px 24px;
+      padding: 18px 24px;
       border-bottom: 2px solid #2196f3;
-    }
-
-    @media (max-width: 480px) {
-      header { padding: 16px; }
-      header h1 { font-size: 17px; }
-      main { padding: 20px 12px; }
-      .uri-row { flex-wrap: wrap; }
-      .btn-copy { width: 100%; text-align: center; }
     }
 
     header h1 { font-size: 20px; font-weight: 700; color: #fff; }
     header p  { font-size: 13px; color: #90caf9; margin-top: 4px; }
 
-    main {
-      max-width: 680px;
-      margin: 0 auto;
-      padding: 32px 24px;
+    /* ── Tab navigation ── */
+    .tab-nav {
+      background: #16213e;
+      border-bottom: 1px solid #263238;
+      display: flex;
+      overflow-x: auto;
+      -webkit-overflow-scrolling: touch;
+      position: sticky;
+      top: 0;
+      z-index: 10;
+    }
+
+    .tab-btn {
+      background: none;
+      border: none;
+      border-bottom: 3px solid transparent;
+      color: #78909c;
+      cursor: pointer;
+      font-family: inherit;
+      font-size: 13px;
+      font-weight: 600;
+      padding: 13px 18px;
+      transition: color 0.15s;
+      white-space: nowrap;
+    }
+
+    .tab-btn:hover  { color: #e0e0e0; }
+    .tab-btn.active { color: #2196f3; border-bottom-color: #2196f3; }
+
+    /* ── Tab panels ── */
+    .tab-panel { display: none; }
+
+    /* Settings-style panels: centered, max 680px */
+    .tab-panel.active.settings-panel {
       display: flex;
       flex-direction: column;
       gap: 28px;
+      max-width: 680px;
+      margin: 0 auto;
+      padding: 32px 24px;
     }
 
-    /* ── Sections ── */
+    /* Wide panels (import, mappings) */
+    .tab-panel.active.wide-panel {
+      display: block;
+      max-width: 980px;
+      margin: 0 auto;
+      padding: 24px 16px 40px;
+    }
+
+    @media (max-width: 480px) {
+      header { padding: 14px 16px; }
+      header h1 { font-size: 17px; }
+      .tab-panel.active.settings-panel { padding: 20px 12px; }
+      .tab-panel.active.wide-panel { padding: 14px 10px 30px; }
+      .uri-row { flex-wrap: wrap; }
+      .btn-copy { width: 100%; text-align: center; }
+    }
+
+    /* ── Section cards ── */
     .section {
       background: #16213e;
       border: 1px solid #263238;
@@ -59,7 +102,7 @@
       border-bottom: 1px solid #1e2a3a;
     }
 
-    /* ── Form ── */
+    /* ── Form elements ── */
     label {
       display: block;
       font-size: 12px;
@@ -133,7 +176,7 @@
     .btn-copy:hover { opacity: 0.8; }
     .btn-copy.copied { color: #a5d6a7; border-color: #2e7d32; }
 
-    /* ── Status ── */
+    /* ── Status rows ── */
     .status-row {
       display: flex;
       justify-content: space-between;
@@ -144,10 +187,10 @@
     }
 
     .status-row:last-child { border-bottom: none; }
-    .status-key   { color: #78909c; font-size: 12px; }
-    .status-val   { color: #fff; font-weight: 600; }
-    .status-ok    { color: #a5d6a7; }
-    .status-err   { color: #ffab91; }
+    .status-key { color: #78909c; font-size: 12px; }
+    .status-val { color: #fff; font-weight: 600; }
+    .status-ok  { color: #a5d6a7; }
+    .status-err { color: #ffab91; }
 
     /* ── Toggle rows ── */
     .toggle-row {
@@ -159,17 +202,8 @@
     }
 
     .toggle-row:last-of-type { border-bottom: none; }
-
-    .toggle-label {
-      font-size: 13px;
-      color: #e0e0e0;
-    }
-
-    .toggle-hint {
-      font-size: 11px;
-      color: #546e7a;
-      margin-top: 2px;
-    }
+    .toggle-label { font-size: 13px; color: #e0e0e0; }
+    .toggle-hint  { font-size: 11px; color: #546e7a; margin-top: 2px; }
 
     input[type="checkbox"] {
       width: 18px;
@@ -181,19 +215,30 @@
 
     /* ── Buttons ── */
     .btn {
-      padding: 11px 20px;
+      padding: 9px 18px;
       border: none;
       border-radius: 8px;
-      font-size: 14px;
+      font-size: 13px;
       font-weight: 600;
       cursor: pointer;
       transition: opacity 0.15s;
+      font-family: inherit;
     }
 
-    .btn:hover   { opacity: 0.85; }
+    .btn:hover    { opacity: 0.85; }
     .btn:disabled { opacity: 0.4; cursor: not-allowed; }
-    .btn-primary  { background: #2196f3; color: #fff; }
-    .btn-row { display: flex; gap: 10px; margin-top: 16px; align-items: center; }
+
+    .btn-primary   { background: #2196f3; color: #fff; }
+    .btn-danger    { background: #e74c3c; color: #fff; }
+    .btn-secondary { background: #263238; color: #90caf9; border: 1px solid #37474f; }
+
+    .btn-row {
+      display: flex;
+      gap: 10px;
+      margin-top: 16px;
+      align-items: center;
+      flex-wrap: wrap;
+    }
 
     /* ── Messages ── */
     .msg {
@@ -209,12 +254,7 @@
     .msg-err { background: #4e342e; color: #ffab91; }
 
     /* ── Links ── */
-    a {
-      color: #90caf9;
-      text-decoration: none;
-      font-size: 13px;
-    }
-
+    a { color: #90caf9; text-decoration: none; font-size: 13px; }
     a:hover { text-decoration: underline; }
 
     .link-row {
@@ -226,50 +266,482 @@
     }
 
     .link-row span { color: #546e7a; }
+
+    /* ═══════════════════════════════════════════════════════════════ */
+    /* ── IMPORT TAB ── */
+    /* ═══════════════════════════════════════════════════════════════ */
+
+    .import-empty {
+      text-align: center;
+      padding: 60px 24px;
+      color: #546e7a;
+    }
+
+    .import-empty .icon { font-size: 48px; margin-bottom: 12px; }
+    .import-empty h3 { font-size: 16px; color: #90caf9; margin-bottom: 8px; }
+    .import-empty p  { font-size: 14px; line-height: 1.6; margin-bottom: 20px; }
+
+    /* Action bar */
+    .action-bar {
+      display: flex;
+      gap: 10px;
+      align-items: center;
+      flex-wrap: wrap;
+      margin-bottom: 14px;
+    }
+
+    /* Progress bar */
+    #import-progress-wrap { display: none; margin-bottom: 14px; }
+
+    #import-progress-label {
+      font-size: 12px;
+      color: #90caf9;
+      margin-bottom: 6px;
+    }
+
+    .progress-bg { background: #263238; border-radius: 6px; height: 8px; overflow: hidden; }
+    #import-progress-fill {
+      background: #e74c3c;
+      height: 100%;
+      border-radius: 6px;
+      width: 0%;
+      transition: width 0.3s;
+    }
+
+    /* Result summary */
+    #import-result-summary {
+      display: none;
+      padding: 12px 16px;
+      border-radius: 8px;
+      font-size: 13px;
+      margin-bottom: 14px;
+      line-height: 1.6;
+    }
+
+    #import-result-summary.ok  { background: #1b5e20; color: #a5d6a7; }
+    #import-result-summary.err { background: #4e342e; color: #ffab91; }
+
+    /* Import table */
+    .import-table-wrap {
+      overflow-x: auto;
+      -webkit-overflow-scrolling: touch;
+      border-radius: 10px;
+      border: 1px solid #263238;
+    }
+
+    .import-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 13px;
+    }
+
+    .import-table thead { background: #16213e; }
+
+    .import-table th {
+      padding: 11px 12px;
+      text-align: left;
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      color: #90caf9;
+      white-space: nowrap;
+    }
+
+    .import-table th.th-check { width: 40px; text-align: center; }
+
+    .import-table tbody tr {
+      border-top: 1px solid #1e2a3a;
+      transition: background 0.1s;
+    }
+
+    .import-table tbody tr:hover { background: #1e2a3a; }
+    .import-table tbody tr.row-done { opacity: 0.55; }
+
+    .import-table td { padding: 9px 12px; vertical-align: middle; }
+
+    /* Cover cell */
+    .td-cover { width: 48px; }
+    .td-cover img {
+      width: 34px;
+      height: 50px;
+      object-fit: cover;
+      border-radius: 4px;
+      display: block;
+    }
+    .no-cover {
+      width: 34px;
+      height: 50px;
+      background: #263238;
+      border-radius: 4px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 16px;
+    }
+
+    /* Title cell */
+    .td-title { font-weight: 600; color: #fff; max-width: 200px; }
+    .td-title .slug { font-size: 11px; color: #546e7a; font-weight: 400; margin-top: 2px; font-family: 'Courier New', monospace; }
+
+    /* Rolia status badges */
+    .rolia-badge {
+      display: inline-block;
+      padding: 2px 8px;
+      border-radius: 10px;
+      font-size: 11px;
+      font-weight: 600;
+      white-space: nowrap;
+    }
+
+    .rolia-reading      { background: #1a237e; color: #90caf9; }
+    .rolia-completed    { background: #1b5e20; color: #a5d6a7; }
+    .rolia-on_hold      { background: #4a148c; color: #ce93d8; }
+    .rolia-dropped      { background: #4e342e; color: #ffab91; }
+    .rolia-plan_to_read { background: #263238; color: #78909c; }
+
+    /* Chapter cell */
+    .td-chapter { color: #90caf9; font-weight: 600; white-space: nowrap; }
+
+    /* MAL match cell */
+    .td-mal { max-width: 220px; }
+
+    /* MAL match badges */
+    .mal-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      padding: 3px 9px;
+      border-radius: 10px;
+      font-size: 12px;
+      font-weight: 600;
+      white-space: nowrap;
+      position: relative;
+      cursor: default;
+    }
+
+    .badge-matched   { background: #2ecc71; color: #fff; }
+    .badge-uncertain { background: #f39c12; color: #fff; }
+    .badge-notfound  { background: #e74c3c; color: #fff; }
+
+    .mal-badge[data-tooltip]::after {
+      content: attr(data-tooltip);
+      position: absolute;
+      bottom: calc(100% + 6px);
+      left: 0;
+      background: #263238;
+      color: #e0e0e0;
+      padding: 6px 10px;
+      border-radius: 6px;
+      font-size: 11px;
+      white-space: nowrap;
+      z-index: 100;
+      border: 1px solid #37474f;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.5);
+      display: none;
+      pointer-events: none;
+    }
+
+    .mal-badge[data-tooltip]:hover::after { display: block; }
+
+    .mal-match-title {
+      font-size: 12px;
+      color: #e0e0e0;
+      margin-top: 3px;
+      max-width: 160px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    /* Spinner */
+    .spinner-inline {
+      display: inline-block;
+      width: 14px;
+      height: 14px;
+      border: 2px solid #37474f;
+      border-top-color: #90caf9;
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+      vertical-align: middle;
+    }
+
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* Checkbox cell */
+    .td-check { text-align: center; }
+    .import-table input[type="checkbox"] {
+      width: 15px;
+      height: 15px;
+      accent-color: #e74c3c;
+      cursor: pointer;
+    }
+    .import-table input[type="checkbox"]:disabled { opacity: 0.3; cursor: not-allowed; }
+
+    /* Edit button */
+    .btn-edit {
+      background: none;
+      border: 1px solid #37474f;
+      border-radius: 6px;
+      color: #90caf9;
+      cursor: pointer;
+      font-family: inherit;
+      font-size: 13px;
+      padding: 3px 7px;
+      transition: opacity 0.15s;
+      white-space: nowrap;
+    }
+    .btn-edit:hover { opacity: 0.7; }
+
+    .btn-delete {
+      background: none;
+      border: 1px solid #4e342e;
+      border-radius: 6px;
+      color: #ef9a9a;
+      cursor: pointer;
+      font-family: inherit;
+      font-size: 13px;
+      padding: 3px 7px;
+      transition: opacity 0.15s;
+    }
+    .btn-delete:hover { opacity: 0.7; }
+
+    /* Row result status */
+    .td-row-status { width: 28px; text-align: center; font-size: 14px; }
+
+    /* Badge legend */
+    .badge-legend {
+      display: flex;
+      gap: 20px;
+      flex-wrap: wrap;
+      padding: 12px 16px;
+      background: #16213e;
+      border: 1px solid #263238;
+      border-radius: 8px;
+      font-size: 12px;
+      color: #78909c;
+      align-items: center;
+      margin-top: 12px;
+    }
+
+    .badge-legend-item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    /* ═══════════════════════════════════════════════════════════════ */
+    /* ── INLINE EDIT COMPONENT ── */
+    /* ═══════════════════════════════════════════════════════════════ */
+
+    .inline-edit-wrap {
+      display: flex;
+      flex-direction: column;
+      gap: 5px;
+      min-width: 180px;
+    }
+
+    .inline-edit-row {
+      display: flex;
+      gap: 6px;
+      align-items: center;
+    }
+
+    .inline-edit-input {
+      background: #0d1117;
+      border: 1px solid #2196f3;
+      border-radius: 6px;
+      color: #fff;
+      font-family: inherit;
+      font-size: 13px;
+      outline: none;
+      padding: 6px 10px;
+      flex: 1;
+    }
+
+    .btn-inline-cancel {
+      background: none;
+      border: none;
+      color: #78909c;
+      cursor: pointer;
+      font-size: 16px;
+      line-height: 1;
+      padding: 4px;
+    }
+
+    .btn-inline-cancel:hover { color: #ef9a9a; }
+
+    .inline-results {
+      background: #0d1117;
+      border: 1px solid #37474f;
+      border-radius: 6px;
+      max-height: 180px;
+      overflow-y: auto;
+    }
+
+    .inline-result {
+      cursor: pointer;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 8px;
+      padding: 7px 10px;
+      transition: background 0.1s;
+    }
+
+    .inline-result:hover { background: #1e2a3a; }
+    .ir-title { color: #fff; font-size: 12px; font-weight: 600; flex: 1; }
+    .ir-id    { color: #546e7a; font-size: 11px; font-family: 'Courier New', monospace; white-space: nowrap; }
+    .inline-msg { padding: 8px 10px; font-size: 12px; color: #546e7a; }
+
+    /* ═══════════════════════════════════════════════════════════════ */
+    /* ── MAPPINGS TAB ── */
+    /* ═══════════════════════════════════════════════════════════════ */
+
+    .pending-notice {
+      background: #2a1a00;
+      border: 1px solid #f39c12;
+      border-left: 4px solid #f39c12;
+      border-radius: 8px;
+      padding: 14px 18px;
+      margin-bottom: 20px;
+    }
+
+    .pending-notice .pn-label {
+      color: #f39c12;
+      font-size: 11px;
+      text-transform: uppercase;
+      font-weight: 700;
+      letter-spacing: 0.5px;
+      margin-bottom: 4px;
+    }
+
+    .pending-notice .pn-slug {
+      color: #fff;
+      font-size: 15px;
+      font-weight: 700;
+      font-family: 'Courier New', monospace;
+      margin-bottom: 10px;
+    }
+
+    .pending-notice .pn-hint {
+      color: #78909c;
+      font-size: 12px;
+      margin-bottom: 12px;
+    }
+
+    .mappings-table-wrap {
+      overflow-x: auto;
+      border-radius: 10px;
+      border: 1px solid #263238;
+    }
+
+    .mappings-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 13px;
+    }
+
+    .mappings-table thead { background: #16213e; }
+
+    .mappings-table th {
+      padding: 11px 14px;
+      text-align: left;
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      color: #90caf9;
+      white-space: nowrap;
+    }
+
+    .mappings-table tbody tr {
+      border-top: 1px solid #1e2a3a;
+      transition: background 0.1s;
+    }
+
+    .mappings-table tbody tr:hover { background: #1e2a3a; }
+    .mappings-table td { padding: 10px 14px; vertical-align: middle; }
+
+    .td-slug {
+      font-family: 'Courier New', monospace;
+      font-size: 12px;
+      color: #a5d6a7;
+      max-width: 160px;
+    }
+
+    .td-mal-title {
+      color: #fff;
+      font-weight: 600;
+      max-width: 220px;
+    }
+
+    .td-mal-id {
+      font-family: 'Courier New', monospace;
+      font-size: 12px;
+      color: #546e7a;
+      white-space: nowrap;
+    }
+
+    .td-actions { white-space: nowrap; }
+    .td-actions .btn-edit   { margin-right: 6px; }
+
+    .mappings-empty {
+      text-align: center;
+      padding: 50px 24px;
+      color: #546e7a;
+      font-size: 14px;
+    }
+
+    #mappings-loading {
+      text-align: center;
+      padding: 40px;
+      color: #90caf9;
+      font-size: 13px;
+    }
   </style>
 </head>
 <body>
 
   <header>
     <h1>⚙️ RoliaSync – Settings</h1>
-    <p>Configure your MyAnimeList API credentials</p>
+    <p>Configure your MyAnimeList API credentials and preferences</p>
   </header>
 
-  <main>
+  <!-- Tab navigation -->
+  <nav class="tab-nav">
+    <button class="tab-btn active" data-tab="general">⚙️ General</button>
+    <button class="tab-btn" data-tab="notifications">🔔 Notifications</button>
+    <button class="tab-btn" data-tab="auto-status">🔄 Auto Status</button>
+    <button class="tab-btn" data-tab="import">📥 Import</button>
+    <button class="tab-btn" data-tab="mappings">🗂️ Mappings</button>
+  </nav>
 
-    <!-- MAL Client ID -->
+  <!-- ═══ GENERAL ═══════════════════════════════════════════════════ -->
+  <div class="tab-panel settings-panel active" data-panel="general">
+
     <div class="section">
       <div class="section-title">MAL Client ID</div>
-
       <label for="client-id-input">Client ID (from MAL API config)</label>
-      <input
-        type="text"
-        id="client-id-input"
-        placeholder="e.g. abc123def456..."
-        spellcheck="false"
-        autocomplete="off"
-      />
+      <input type="text" id="client-id-input" placeholder="e.g. abc123def456…" spellcheck="false" autocomplete="off" />
       <p class="hint">
         Find your Client ID at
         <a href="https://myanimelist.net/apiconfig" target="_blank">myanimelist.net/apiconfig</a>
         → your app → Client ID.
-        It is stored encrypted in your browser and synced via Firefox Sync.
+        Stored encrypted and synced via Firefox Sync.
       </p>
-
       <div class="btn-row">
         <button class="btn btn-primary" id="btn-save">Save</button>
       </div>
-
       <div class="msg" id="save-msg"></div>
     </div>
 
-    <!-- Redirect URIs (copy for MAL) -->
     <div class="section">
       <div class="section-title">Redirect URI for MAL API config</div>
       <p class="hint" style="margin-bottom:14px;">
-        Enter the matching URI in your
-        <a href="https://myanimelist.net/apiconfig" target="_blank">MAL app configuration</a>
-        (field "Redirect URI"). MAL allows multiple URIs — adding both is recommended.
+        Add these URIs to your
+        <a href="https://myanimelist.net/apiconfig" target="_blank">MAL app config</a>
+        (field "Redirect URI"). Adding both is recommended.
       </p>
 
       <div class="uri-label" style="margin-bottom:6px;">Desktop (Firefox)</div>
@@ -285,10 +757,8 @@
       </div>
     </div>
 
-    <!-- Login status -->
     <div class="section">
       <div class="section-title">MAL login status</div>
-
       <div class="status-row">
         <span class="status-key">Signed in as</span>
         <span class="status-val" id="status-username">–</span>
@@ -299,7 +769,23 @@
       </div>
     </div>
 
-    <!-- Notification settings -->
+    <div class="section">
+      <div class="section-title">Useful links</div>
+      <div class="link-row">
+        <span>🔧</span>
+        <a href="https://myanimelist.net/apiconfig" target="_blank">MAL API config — manage your app</a>
+      </div>
+      <div class="link-row">
+        <span>📋</span>
+        <a href="https://myanimelist.net/apiconfig/references/api/v2" target="_blank">MAL API documentation (v2)</a>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- ═══ NOTIFICATIONS ═════════════════════════════════════════════ -->
+  <div class="tab-panel settings-panel" data-panel="notifications">
+
     <div class="section">
       <div class="section-title">Notification settings</div>
 
@@ -330,11 +816,14 @@
       <div class="btn-row">
         <button class="btn btn-primary" id="btn-save-notif">Save</button>
       </div>
-
       <div class="msg" id="notif-msg"></div>
     </div>
 
-    <!-- Auto status -->
+  </div>
+
+  <!-- ═══ AUTO STATUS ═══════════════════════════════════════════════ -->
+  <div class="tab-panel settings-panel" data-panel="auto-status">
+
     <div class="section">
       <div class="section-title">Auto status</div>
 
@@ -373,24 +862,109 @@
       <div class="btn-row">
         <button class="btn btn-primary" id="btn-save-auto">Save</button>
       </div>
-
       <div class="msg" id="auto-status-msg"></div>
     </div>
 
-    <!-- Links -->
-    <div class="section">
-      <div class="section-title">Useful links</div>
-      <div class="link-row">
-        <span>🔧</span>
-        <a href="https://myanimelist.net/apiconfig" target="_blank">MAL API config — manage your app</a>
+  </div>
+
+  <!-- ═══ IMPORT ════════════════════════════════════════════════════ -->
+  <div class="tab-panel wide-panel" data-panel="import">
+
+    <!-- No data state -->
+    <div id="import-empty" class="import-empty">
+      <div class="icon">📥</div>
+      <h3>Import from bookmarks</h3>
+      <p>Go to your bookmarks on roliascan.com and click the RoliaSync import button.</p>
+      <a href="https://roliascan.com/bookmarks" target="_blank" class="btn btn-primary" style="display:inline-block;">
+        Open bookmarks page
+      </a>
+    </div>
+
+    <!-- Import UI (shown when pending_import exists) -->
+    <div id="import-ui" style="display:none;">
+
+      <div class="action-bar">
+        <button class="btn btn-secondary" id="btn-select-all">Select all</button>
+        <button class="btn btn-secondary" id="btn-deselect-all">Deselect all</button>
+        <button class="btn btn-danger" id="btn-import-run" disabled>Import selected (0)</button>
+        <button class="btn btn-secondary" id="btn-import-clear" style="margin-left:auto;">🗑️ Clear</button>
       </div>
-      <div class="link-row">
-        <span>📋</span>
-        <a href="https://myanimelist.net/apiconfig/references/api/v2" target="_blank">MAL API documentation (v2)</a>
+
+      <div id="import-progress-wrap">
+        <div id="import-progress-label">Importing…</div>
+        <div class="progress-bg"><div id="import-progress-fill"></div></div>
+      </div>
+
+      <div id="import-result-summary"></div>
+
+      <div class="import-table-wrap">
+        <table class="import-table">
+          <thead>
+            <tr>
+              <th class="th-check">☑</th>
+              <th></th>
+              <th>Title</th>
+              <th>Status</th>
+              <th>Ch.</th>
+              <th>MAL Match</th>
+              <th></th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody id="import-body"></tbody>
+        </table>
+      </div>
+
+      <div class="badge-legend">
+        <div class="badge-legend-item">
+          <span class="mal-badge badge-matched">✅ Matched</span>
+          <span>Found in saved mappings</span>
+        </div>
+        <div class="badge-legend-item">
+          <span class="mal-badge badge-uncertain">⚠️ Approximate</span>
+          <span>Found via MAL search — verify title</span>
+        </div>
+        <div class="badge-legend-item">
+          <span class="mal-badge badge-notfound">❌ Not found</span>
+          <span>Assign manually with ✏️</span>
+        </div>
       </div>
     </div>
 
-  </main>
+  </div>
+
+  <!-- ═══ MAPPINGS ══════════════════════════════════════════════════ -->
+  <div class="tab-panel wide-panel" data-panel="mappings">
+
+    <!-- Shown when opened with ?slug= param from notification -->
+    <div id="mappings-pending-notice" style="display:none;" class="pending-notice">
+      <div class="pn-label">⚠️ Unmatched slug — assign manually</div>
+      <div class="pn-slug" id="pending-slug-display">–</div>
+      <div class="pn-hint">This slug was not found automatically on MAL. Search below and select the correct manga.</div>
+      <div id="pending-slug-edit"></div>
+    </div>
+
+    <div id="mappings-loading">Loading mappings…</div>
+
+    <div id="mappings-empty" style="display:none;" class="mappings-empty">
+      No mappings saved yet.<br>They are created automatically when manga are synced.
+    </div>
+
+    <div id="mappings-table-wrap" style="display:none;" class="mappings-table-wrap">
+      <table class="mappings-table">
+        <thead>
+          <tr>
+            <th>Slug</th>
+            <th>MAL Title</th>
+            <th>ID</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody id="mappings-body"></tbody>
+      </table>
+    </div>
+
+  </div>
 
   <script src="options.js"></script>
 </body>

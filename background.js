@@ -448,7 +448,7 @@ api.notifications.onClicked.addListener((notificationId) => {
   if (notificationId.startsWith('not_found_')) {
     const slug = notificationId.slice('not_found_'.length);
     api.tabs.create({
-      url: api.runtime.getURL(`mapping.html?slug=${encodeURIComponent(slug)}`),
+      url: api.runtime.getURL('options.html') + `?slug=${encodeURIComponent(slug)}#mappings`,
     });
     api.notifications.clear(notificationId);
   }
@@ -784,12 +784,12 @@ api.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
 
     // ── Bulk import ────────────────────────────────────────────────────────────
 
-    // Store manga list in local storage and open the import page
+    // Store manga list in local storage and open the import tab
     case 'OPEN_IMPORT':
       (async () => {
         try {
           await api.storage.local.set({ pending_import: msg.manga });
-          await api.tabs.create({ url: api.runtime.getURL('import.html') });
+          await api.tabs.create({ url: api.runtime.getURL('options.html') + '#import' });
           sendResponse({ ok: true });
         } catch (err) {
           sendResponse({ ok: false, error: err.message });
@@ -847,6 +847,19 @@ api.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
             errorMsg:  null,
           });
 
+          sendResponse({ ok: true });
+        } catch (err) {
+          sendResponse({ ok: false, error: err.message });
+        }
+      })();
+      return true;
+
+    case 'DELETE_MAPPING':
+      (async () => {
+        try {
+          const { slugMappings = {} } = await syncGet('slugMappings');
+          delete slugMappings[msg.slug];
+          await syncSet({ slugMappings });
           sendResponse({ ok: true });
         } catch (err) {
           sendResponse({ ok: false, error: err.message });

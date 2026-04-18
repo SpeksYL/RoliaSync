@@ -130,6 +130,18 @@ function renderHistory(history) {
       slugDiv.textContent = slug;
       tdTitle.appendChild(slugDiv);
     }
+    if (slug) {
+      const editBtn = document.createElement('button');
+      editBtn.className   = 'btn-edit-mapping';
+      editBtn.textContent = '✏️';
+      editBtn.title       = 'Edit MAL mapping';
+      editBtn.addEventListener('click', () => {
+        api.tabs.create({
+          url: api.runtime.getURL('options.html') + `?slug=${encodeURIComponent(slug)}#mappings`,
+        });
+      });
+      tdTitle.appendChild(editBtn);
+    }
 
     // Chapter
     const tdChapter = document.createElement('td');
