@@ -334,6 +334,49 @@
       <div class="msg" id="notif-msg"></div>
     </div>
 
+    <!-- Auto status -->
+    <div class="section">
+      <div class="section-title">Auto status</div>
+
+      <div class="toggle-row">
+        <div>
+          <div class="toggle-label">Set "Reading" on first chapter</div>
+          <div class="toggle-hint">Automatically mark manga as reading when you open the first chapter</div>
+        </div>
+        <input type="checkbox" id="auto-set-reading" checked />
+      </div>
+
+      <div class="toggle-row">
+        <div>
+          <div class="toggle-label">Set "Completed" when finished</div>
+          <div class="toggle-hint">Only if the manga is marked as finished on MAL</div>
+        </div>
+        <input type="checkbox" id="auto-set-completed" checked />
+      </div>
+
+      <div class="toggle-row">
+        <div>
+          <div class="toggle-label">Set "On Hold" on last available chapter</div>
+          <div class="toggle-hint">For ongoing manga, when you reach the latest chapter</div>
+        </div>
+        <input type="checkbox" id="auto-set-on-hold" checked />
+      </div>
+
+      <div class="toggle-row">
+        <div>
+          <div class="toggle-label">Never change status automatically</div>
+          <div class="toggle-hint">Only update chapter count, never touch reading status</div>
+        </div>
+        <input type="checkbox" id="auto-never-change" />
+      </div>
+
+      <div class="btn-row">
+        <button class="btn btn-primary" id="btn-save-auto">Save</button>
+      </div>
+
+      <div class="msg" id="auto-status-msg"></div>
+    </div>
+
     <!-- Links -->
     <div class="section">
       <div class="section-title">Useful links</div>

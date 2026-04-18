@@ -1,0 +1,334 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>RoliaSync – Import to MAL</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: #1a1a2e;
+      color: #e0e0e0;
+      min-height: 100vh;
+    }
+
+    /* ── Header ── */
+    header {
+      background: #16213e;
+      padding: 16px 24px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      border-bottom: 2px solid #e74c3c;
+      position: sticky;
+      top: 0;
+      z-index: 10;
+    }
+
+    header h1 { font-size: 18px; font-weight: 700; color: #fff; }
+
+    header span.subtitle {
+      font-size: 12px;
+      color: #ef9a9a;
+      margin-top: 2px;
+      display: block;
+    }
+
+    #summary-count {
+      font-size: 12px;
+      color: #546e7a;
+      background: #263238;
+      padding: 4px 10px;
+      border-radius: 12px;
+    }
+
+    /* ── Main ── */
+    main {
+      max-width: 960px;
+      margin: 0 auto;
+      padding: 20px 16px 40px;
+    }
+
+    /* ── Action bar ── */
+    .action-bar {
+      display: flex;
+      gap: 10px;
+      align-items: center;
+      flex-wrap: wrap;
+      margin-bottom: 16px;
+    }
+
+    .btn {
+      padding: 9px 16px;
+      border: none;
+      border-radius: 8px;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: opacity 0.15s;
+      white-space: nowrap;
+    }
+
+    .btn:hover    { opacity: 0.85; }
+    .btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+    .btn-primary  { background: #e74c3c; color: #fff; }
+    .btn-secondary { background: #263238; color: #90caf9; border: 1px solid #37474f; }
+
+    #btn-import { min-width: 180px; }
+
+    /* ── Progress bar ── */
+    #progress-wrap {
+      display: none;
+      margin-bottom: 16px;
+    }
+
+    #progress-label {
+      font-size: 12px;
+      color: #90caf9;
+      margin-bottom: 6px;
+    }
+
+    #progress-bar-bg {
+      background: #263238;
+      border-radius: 6px;
+      height: 8px;
+      overflow: hidden;
+    }
+
+    #progress-bar {
+      background: #e74c3c;
+      height: 100%;
+      border-radius: 6px;
+      width: 0%;
+      transition: width 0.3s;
+    }
+
+    /* ── Result summary ── */
+    #result-summary {
+      display: none;
+      padding: 12px 16px;
+      border-radius: 8px;
+      font-size: 13px;
+      margin-bottom: 16px;
+      line-height: 1.6;
+    }
+
+    #result-summary.ok  { background: #1b5e20; color: #a5d6a7; }
+    #result-summary.err { background: #4e342e; color: #ffab91; }
+
+    /* ── Table ── */
+    .table-wrapper {
+      overflow-x: auto;
+      border-radius: 10px;
+      border: 1px solid #263238;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 13px;
+    }
+
+    thead { background: #16213e; }
+
+    th {
+      padding: 11px 12px;
+      text-align: left;
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      color: #90caf9;
+      white-space: nowrap;
+    }
+
+    th.th-check { width: 40px; text-align: center; }
+
+    tbody tr {
+      border-top: 1px solid #1e2a3a;
+      transition: background 0.1s;
+    }
+
+    tbody tr:hover { background: #1e2a3a; }
+    tbody tr.row-done { opacity: 0.6; }
+    tbody tr.row-error td.td-mal { color: #ffab91; }
+
+    td { padding: 10px 12px; vertical-align: middle; }
+
+    /* Cover */
+    .td-cover { width: 48px; }
+    .td-cover img {
+      width: 36px;
+      height: 52px;
+      object-fit: cover;
+      border-radius: 4px;
+      background: #263238;
+      display: block;
+    }
+    .td-cover .no-cover {
+      width: 36px;
+      height: 52px;
+      background: #263238;
+      border-radius: 4px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 18px;
+    }
+
+    /* Title */
+    .td-title { font-weight: 600; color: #fff; max-width: 220px; }
+    .td-title .slug {
+      font-size: 11px;
+      color: #546e7a;
+      font-weight: 400;
+      margin-top: 2px;
+      font-family: 'Courier New', monospace;
+    }
+
+    /* Rolia Status */
+    .td-status { white-space: nowrap; }
+    .rolia-badge {
+      display: inline-block;
+      padding: 2px 8px;
+      border-radius: 10px;
+      font-size: 11px;
+      font-weight: 600;
+    }
+    .rolia-reading      { background: #1a237e; color: #90caf9; }
+    .rolia-completed    { background: #1b5e20; color: #a5d6a7; }
+    .rolia-on_hold      { background: #4a148c; color: #ce93d8; }
+    .rolia-dropped      { background: #4e342e; color: #ffab91; }
+    .rolia-plan_to_read { background: #263238; color: #78909c; }
+
+    /* Chapter */
+    .td-chapter { color: #90caf9; font-weight: 600; white-space: nowrap; }
+
+    /* MAL Match */
+    .td-mal { max-width: 200px; }
+    .mal-match { display: flex; align-items: flex-start; gap: 6px; }
+    .mal-icon  { font-size: 14px; flex-shrink: 0; margin-top: 1px; }
+    .mal-title { font-size: 12px; color: #fff; }
+    .mal-id    { font-size: 11px; color: #546e7a; margin-top: 1px; font-family: 'Courier New', monospace; }
+    .mal-none  { font-size: 12px; color: #ef9a9a; }
+
+    /* Loading spinner inline */
+    .spinner-inline {
+      display: inline-block;
+      width: 14px;
+      height: 14px;
+      border: 2px solid #37474f;
+      border-top-color: #90caf9;
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+      vertical-align: middle;
+    }
+
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* Checkbox */
+    .td-check { text-align: center; }
+    input[type="checkbox"] {
+      width: 16px;
+      height: 16px;
+      accent-color: #e74c3c;
+      cursor: pointer;
+    }
+    input[type="checkbox"]:disabled { opacity: 0.3; cursor: not-allowed; }
+
+    /* Row status icon */
+    .td-row-status { width: 28px; text-align: center; font-size: 14px; }
+
+    /* Loading / empty states */
+    #loading-state, #empty-state {
+      text-align: center;
+      padding: 60px 24px;
+      color: #546e7a;
+    }
+
+    .spinner-big {
+      display: inline-block;
+      width: 32px;
+      height: 32px;
+      border: 3px solid #37474f;
+      border-top-color: #e74c3c;
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+      margin-bottom: 12px;
+    }
+
+    @media (max-width: 600px) {
+      header { padding: 12px 16px; }
+      main { padding: 14px 10px 30px; }
+      .td-cover, th:nth-child(1) { display: none; }
+      .td-title { max-width: 140px; }
+      .td-mal   { max-width: 120px; }
+    }
+  </style>
+</head>
+<body>
+
+  <header>
+    <div>
+      <h1>📥 Import to MAL</h1>
+      <span class="subtitle">Sync your Rolia bookmarks to MyAnimeList</span>
+    </div>
+    <span id="summary-count">Loading…</span>
+  </header>
+
+  <main>
+
+    <div id="loading-state">
+      <div class="spinner-big"></div>
+      <div>Loading bookmarks…</div>
+    </div>
+
+    <div id="empty-state" style="display:none;">
+      <div style="font-size:48px; margin-bottom:12px;">📭</div>
+      <p>No bookmarks found.<br>Open your Rolia bookmarks page first.</p>
+    </div>
+
+    <div id="import-ui" style="display:none;">
+      <!-- Action bar -->
+      <div class="action-bar">
+        <button class="btn btn-secondary" id="btn-select-all">Select all</button>
+        <button class="btn btn-secondary" id="btn-deselect-all">Deselect all</button>
+        <button class="btn btn-primary"   id="btn-import" disabled>Import selected (0)</button>
+      </div>
+
+      <!-- Progress bar -->
+      <div id="progress-wrap">
+        <div id="progress-label">Importing…</div>
+        <div id="progress-bar-bg"><div id="progress-bar"></div></div>
+      </div>
+
+      <!-- Result summary -->
+      <div id="result-summary"></div>
+
+      <!-- Table -->
+      <div class="table-wrapper">
+        <table>
+          <thead>
+            <tr>
+              <th class="th-check">☑</th>
+              <th></th><!-- cover -->
+              <th>Title</th>
+              <th>Status</th>
+              <th>Ch.</th>
+              <th>MAL match</th>
+              <th></th><!-- row status -->
+            </tr>
+          </thead>
+          <tbody id="import-body"></tbody>
+        </table>
+      </div>
+    </div>
+
+  </main>
+
+  <script src="import.js"></script>
+</body>
+</html>

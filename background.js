@@ -1,26 +1,22 @@
 /**
  * background.js — Background Script (Firefox MV2)
- * Manages OAuth2 PKCE flow, MAL API calls, storage, and slug mappings.
+ * Manages OAuth2 PKCE flow, MAL API calls, storage, slug mappings,
+ * bulk import, status sync, and auto-status on reading.
  */
 
 'use strict';
 
-// Firefox WebExtension API
 const api = browser;
 
 // ─── Configuration ────────────────────────────────────────────────────────────
 const MAL_API_BASE           = 'https://api.myanimelist.net/v2';
 const MAL_AUTH_URL           = 'https://myanimelist.net/v1/oauth2/authorize';
 const MAL_TOKEN_URL          = 'https://myanimelist.net/v1/oauth2/token';
-// Desktop: stable allizom.org URI via identity.getRedirectURL()
-// Android: external URI — webNavigation intercepts the redirect before the page loads
 const ANDROID_REDIRECT_URI   = 'https://roliascan.com/mal-callback';
 const MAX_HISTORY            = 50;
 const RETRY_DELAY_MS         = 3000;
 
 // ─── storage.sync helpers ─────────────────────────────────────────────────────
-// slugMappings and mal_token are stored in storage.sync (Firefox Sync).
-// Falls back to storage.local on quota exceeded or missing sync connection.
 
 async function syncGet(key) {
   try {
@@ -39,14 +35,11 @@ async function syncSet(obj) {
 }
 
 async function syncRemove(keys) {
-  // Remove from sync (ignore error if not present)
   await api.storage.sync.remove(keys).catch(() => {});
-  // Also remove from local (legacy data after migration)
   await api.storage.local.remove(keys).catch(() => {});
 }
 
 // ─── Client ID ────────────────────────────────────────────────────────────────
-// MAL_CLIENT_ID is not hardcoded — stored in storage.sync and set by the user in options.html.
 
 async function getClientId() {
   const { mal_client_id } = await syncGet('mal_client_id');
@@ -81,9 +74,7 @@ function base64UrlEncode(buffer) {
     .replace(/=/g, '');
 }
 
-// ─── OAuth2 — Desktop (identity.launchWebAuthFlow) ───────────────────────────
-// Desktop: stable allizom.org redirect URI via browser.identity.
-// Android: identity.launchWebAuthFlow not available → tab-based flow.
+// ─── OAuth2 ───────────────────────────────────────────────────────────────────
 
 async function handleOAuthCode(code) {
   try {
@@ -96,7 +87,6 @@ async function handleOAuthCode(code) {
 
 async function startOAuthFlowDesktop() {
   const codeVerifier = generateCodeVerifier();
-  // Do NOT set android_redirect_uri → exchangeCodeForToken uses identity API
   await api.storage.local.set({ pkce_verifier: codeVerifier });
 
   const redirectUri = api.identity.getRedirectURL();
@@ -130,7 +120,6 @@ async function startOAuthFlowDesktop() {
 async function startOAuthFlowAndroid() {
   const codeVerifier = generateCodeVerifier();
 
-  // Store redirect URI so exchangeCodeForToken knows it during token exchange
   await api.storage.local.set({
     pkce_verifier:        codeVerifier,
     android_redirect_uri: ANDROID_REDIRECT_URI,
@@ -144,9 +133,6 @@ async function startOAuthFlowAndroid() {
     code_challenge_method: 'plain',
     state:                 crypto.randomUUID(),
   }).toString();
-
-  // Both listeners registered simultaneously — webNavigation is faster, tabs.onUpdated is the fallback.
-  // Register listeners BEFORE opening the tab so no event is missed.
 
   let handled = false;
 
@@ -166,7 +152,6 @@ async function startOAuthFlowAndroid() {
     handleOAuthCode(code);
   }
 
-  // Listener 1: webNavigation (faster, intercepts navigation before the page loads)
   const navListener = (details) => {
     if (details.url.includes('mal-callback') || details.url.includes('code=')) {
       extractAndHandle(details.url, details.tabId);
@@ -177,7 +162,6 @@ async function startOAuthFlowAndroid() {
     url: [{ urlContains: 'roliascan.com' }],
   });
 
-  // Listener 2: tabs.onUpdated (fallback in case webNavigation fires too late)
   const tabListener = (tabId, changeInfo) => {
     if (changeInfo.url &&
         (changeInfo.url.includes('mal-callback') || changeInfo.url.includes('code='))) {
@@ -193,20 +177,17 @@ async function startOAuthFlowAndroid() {
 async function startOAuthFlow() {
   const hasWebAuthFlow = typeof api.identity !== 'undefined' &&
                          typeof api.identity.launchWebAuthFlow === 'function';
-  if (hasWebAuthFlow) {
-    return startOAuthFlowDesktop();
-  }
+  if (hasWebAuthFlow) return startOAuthFlowDesktop();
   return startOAuthFlowAndroid();
 }
 
 // ─── Token exchange ───────────────────────────────────────────────────────────
 
 async function exchangeCodeForToken(code) {
-  const clientId = await getClientId();
-  const stored   = await api.storage.local.get(['pkce_verifier', 'android_redirect_uri']);
+  const clientId      = await getClientId();
+  const stored        = await api.storage.local.get(['pkce_verifier', 'android_redirect_uri']);
   const pkce_verifier = stored.pkce_verifier;
 
-  // Android flow stores redirect URI; desktop uses identity.getRedirectURL()
   let redirectUri;
   if (stored.android_redirect_uri) {
     redirectUri = stored.android_redirect_uri;
@@ -350,12 +331,13 @@ async function searchMangaAuth(slug) {
   return { id: data.data[0].node.id, title: data.data[0].node.title };
 }
 
-async function updateMangaProgress(malId, chapterNum) {
-  const res = await malRequest(
-    'PATCH',
-    `/manga/${malId}/my_list_status`,
-    { num_chapters_read: chapterNum, status: 'reading' }
-  );
+// Update chapter progress, and optionally set reading status.
+// status = null means don't change the status field (MAL keeps existing).
+async function updateMangaProgress(malId, chapterNum, status = null) {
+  const body = { num_chapters_read: chapterNum };
+  if (status) body.status = status;
+
+  const res = await malRequest('PATCH', `/manga/${malId}/my_list_status`, body);
 
   if (!res.ok) {
     const text = await res.text();
@@ -372,17 +354,22 @@ async function getMALUsername() {
   return data.name ?? null;
 }
 
-// ─── MAL list status ──────────────────────────────────────────────────────────
+// ─── MAL manga info (chapter progress + publication status) ───────────────────
 
-async function getMalListStatus(malId) {
+async function getMalMangaInfo(malId) {
   const token = await getValidToken();
   const res   = await fetch(
-    `${MAL_API_BASE}/manga/${malId}?fields=my_list_status`,
+    `${MAL_API_BASE}/manga/${malId}?fields=num_chapters,my_list_status,status`,
     { headers: { Authorization: `Bearer ${token}` } }
   );
-  if (!res.ok) throw new Error(`MAL status query failed: ${res.status}`);
+  if (!res.ok) throw new Error(`MAL info query failed: ${res.status}`);
   const data = await res.json();
-  return data.my_list_status?.num_chapters_read ?? 0;
+  return {
+    numChapters:  data.num_chapters ?? 0,           // 0 = unknown / ongoing
+    malStatus:    data.status ?? '',                 // "finished" | "currently_publishing" | …
+    listStatus:   data.my_list_status?.status ?? null, // user's current reading status
+    chaptersRead: data.my_list_status?.num_chapters_read ?? 0,
+  };
 }
 
 // ─── Slug mapping ─────────────────────────────────────────────────────────────
@@ -409,7 +396,7 @@ async function saveSlugMapping(slug, malId, malTitle) {
   await syncSet({ slugMappings });
 }
 
-// ─── Notification settings ────────────────────────────────────────────────────
+// ─── Settings helpers ─────────────────────────────────────────────────────────
 
 async function getNotificationSettings() {
   const { notification_settings } = await syncGet('notification_settings');
@@ -420,15 +407,23 @@ async function getNotificationSettings() {
   };
 }
 
+async function getAutoStatusSettings() {
+  const { auto_status_settings } = await syncGet('auto_status_settings');
+  return {
+    setReading:   auto_status_settings?.setReading   ?? true,
+    setCompleted: auto_status_settings?.setCompleted ?? true,
+    setOnHold:    auto_status_settings?.setOnHold    ?? true,
+    neverChange:  auto_status_settings?.neverChange  ?? false,
+  };
+}
+
 // ─── Notifications ────────────────────────────────────────────────────────────
 
 async function showNotification(type, message, tabId = null) {
   const settings = await getNotificationSettings();
 
-  // If errorsOnly is on, suppress success notifications
   if (settings.errorsOnly && type === 'success') return;
 
-  // Browser notification (not available on Android)
   if (settings.browserNotifications) {
     try {
       api.notifications.create({
@@ -440,13 +435,12 @@ async function showNotification(type, message, tabId = null) {
     } catch { /* browser.notifications not available on this platform */ }
   }
 
-  // In-page toast via content script (useful on Android)
   if (settings.inPageToast && tabId != null) {
     api.tabs.sendMessage(tabId, {
       action:  'SHOW_TOAST',
       message,
       type:    type === 'success' ? 'success' : 'error',
-    }).catch(() => { /* content script may not be ready */ });
+    }).catch(() => {});
   }
 }
 
@@ -470,7 +464,6 @@ api.notifications.onClicked.addListener((notificationId) => {
 async function syncChapter(slug, chapter, tabId = null) {
   const chapterNum = Number(chapter);
 
-  // Duplicate guard: same chapter as last sync → skip silently
   const { last_sync } = await api.storage.local.get('last_sync');
   if (last_sync?.slug === slug && String(last_sync?.chapter) === String(chapter)) {
     return;
@@ -504,15 +497,12 @@ async function syncChapter(slug, chapter, tabId = null) {
     const { malId, malTitle } = await getMalId(slug);
     historyEntry.malTitle = malTitle;
 
-    // Fetch current MAL progress
-    const currentChapter = await getMalListStatus(malId);
+    const info = await getMalMangaInfo(malId);
+    const currentChapter = info.chaptersRead;
 
-    if (chapterNum === currentChapter) {
-      return 'skip';
-    }
+    if (chapterNum === currentChapter) return 'skip';
 
     if (chapterNum < currentChapter) {
-      // Backward — skip and inform user
       try {
         api.notifications.create(`skipped_${slug}`, {
           type:    'basic',
@@ -527,8 +517,33 @@ async function syncChapter(slug, chapter, tabId = null) {
       return 'skipped';
     }
 
-    // Normal forward sync
-    await updateMangaProgress(malId, chapterNum);
+    // Determine auto status
+    const autoSettings = await getAutoStatusSettings();
+    let newStatus = null;
+
+    if (!autoSettings.neverChange) {
+      const isFirstRead  = currentChapter === 0;
+      const isLastChapter = info.numChapters > 0 && chapterNum >= info.numChapters;
+      const isFinished   = info.malStatus === 'finished';
+
+      if (isFirstRead && autoSettings.setReading) {
+        newStatus = 'reading';
+      }
+      if (isLastChapter) {
+        if (isFinished && autoSettings.setCompleted) {
+          newStatus = 'completed';
+        } else if (!isFinished && autoSettings.setOnHold) {
+          newStatus = 'on_hold';
+        }
+      }
+    }
+
+    // Manga not yet in list — must provide a status to create the entry
+    if (info.listStatus === null && newStatus === null) {
+      newStatus = 'reading';
+    }
+
+    await updateMangaProgress(malId, chapterNum, newStatus);
     historyEntry.status = 'success';
     await api.storage.local.set({ last_sync: { slug, chapter: String(chapter) } });
     await showNotification('success', `${malTitle} — Chapter ${chapter} saved to MAL`, tabId);
@@ -561,7 +576,6 @@ async function syncChapter(slug, chapter, tabId = null) {
     }
   }
 
-  // 'skip' → no history entry
   if (result === 'skip') return;
 
   await addHistoryEntry(historyEntry);
@@ -590,7 +604,6 @@ api.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
       return true;
 
     case 'FORCE_SYNC':
-      // Syncs without MAL progress check (triggered from history page)
       (async () => {
         try {
           const { manga, chapter, malId, malTitle } = msg;
@@ -616,7 +629,6 @@ api.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
         .catch(err  => sendResponse({ ok: false, error: err.message }));
       return true;
 
-    // Fallback: authorization code from options.html ?code= parameter
     case 'OAUTH_CODE':
       exchangeCodeForToken(msg.code)
         .then(() => sendResponse({ ok: true }))
@@ -687,7 +699,6 @@ api.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
     case 'GET_CONFIG':
       (async () => {
         const { mal_client_id } = await syncGet('mal_client_id');
-        // identity.getRedirectURL() not available on Android → try/catch
         let firefoxRedirect = null;
         try {
           if (api.identity && api.identity.getRedirectURL) {
@@ -736,6 +747,132 @@ api.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
             errorsOnly:           msg.settings?.errorsOnly           ?? false,
           };
           await syncSet({ notification_settings: settings });
+          sendResponse({ ok: true });
+        } catch (err) {
+          sendResponse({ ok: false, error: err.message });
+        }
+      })();
+      return true;
+
+    case 'GET_AUTO_STATUS_SETTINGS':
+      (async () => {
+        try {
+          const settings = await getAutoStatusSettings();
+          sendResponse({ ok: true, settings });
+        } catch (err) {
+          sendResponse({ ok: false, error: err.message });
+        }
+      })();
+      return true;
+
+    case 'SAVE_AUTO_STATUS_SETTINGS':
+      (async () => {
+        try {
+          const settings = {
+            setReading:   msg.settings?.setReading   ?? true,
+            setCompleted: msg.settings?.setCompleted ?? true,
+            setOnHold:    msg.settings?.setOnHold    ?? true,
+            neverChange:  msg.settings?.neverChange  ?? false,
+          };
+          await syncSet({ auto_status_settings: settings });
+          sendResponse({ ok: true });
+        } catch (err) {
+          sendResponse({ ok: false, error: err.message });
+        }
+      })();
+      return true;
+
+    // ── Bulk import ────────────────────────────────────────────────────────────
+
+    // Store manga list in local storage and open the import page
+    case 'OPEN_IMPORT':
+      (async () => {
+        try {
+          await api.storage.local.set({ pending_import: msg.manga });
+          await api.tabs.create({ url: api.runtime.getURL('import.html') });
+          sendResponse({ ok: true });
+        } catch (err) {
+          sendResponse({ ok: false, error: err.message });
+        }
+      })();
+      return true;
+
+    // Resolve a roliascan slug to a MAL manga (for import.js)
+    case 'GET_MAL_ID':
+      (async () => {
+        try {
+          const { slugMappings = {} } = await syncGet('slugMappings');
+          if (slugMappings[msg.slug]) {
+            const m = slugMappings[msg.slug];
+            sendResponse({ ok: true, malId: m.id, malTitle: m.title, confidence: 'high' });
+            return;
+          }
+          const result = await searchMangaAuth(msg.slug);
+          if (result) {
+            sendResponse({ ok: true, malId: result.id, malTitle: result.title, confidence: 'medium' });
+          } else {
+            sendResponse({ ok: true, malId: null, malTitle: null, confidence: 'none' });
+          }
+        } catch (err) {
+          sendResponse({ ok: false, error: err.message });
+        }
+      })();
+      return true;
+
+    // Import a single manga entry (chapter progress + reading status)
+    case 'IMPORT_SINGLE':
+      (async () => {
+        try {
+          const { malId, malTitle, slug, chapter, status } = msg;
+          const body = {};
+          if (Number(chapter) > 0) body.num_chapters_read = Number(chapter);
+          if (status)              body.status            = status;
+
+          const res = await malRequest('PATCH', `/manga/${malId}/my_list_status`, body);
+          if (!res.ok) {
+            const text = await res.text();
+            throw new Error(`MAL update failed: ${res.status} — ${text}`);
+          }
+
+          if (slug && malId && malTitle) {
+            await saveSlugMapping(slug, malId, malTitle);
+          }
+
+          await addHistoryEntry({
+            manga:     slug ?? malTitle,
+            malTitle,
+            chapter:   chapter > 0 ? String(chapter) : '–',
+            timestamp: Date.now(),
+            status:    'success',
+            errorMsg:  null,
+          });
+
+          sendResponse({ ok: true });
+        } catch (err) {
+          sendResponse({ ok: false, error: err.message });
+        }
+      })();
+      return true;
+
+    // Sync a status change from the bookmarks page MutationObserver
+    case 'SYNC_STATUS':
+      (async () => {
+        try {
+          let malId = msg.malId ?? null;
+          let malTitle = null;
+
+          if (!malId) {
+            const found = await getMalId(msg.slug);
+            malId    = found.malId;
+            malTitle = found.malTitle;
+          }
+
+          const res = await malRequest(
+            'PATCH',
+            `/manga/${malId}/my_list_status`,
+            { status: msg.status }
+          );
+          if (!res.ok) throw new Error(`Status sync failed: ${res.status}`);
           sendResponse({ ok: true });
         } catch (err) {
           sendResponse({ ok: false, error: err.message });

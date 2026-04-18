@@ -1,6 +1,7 @@
 /**
  * options.js — Settings page
- * Configures MAL Client ID, shows redirect URIs, and manages notification settings.
+ * Configures MAL Client ID, redirect URIs, notification settings,
+ * and auto-status behavior.
  * Also handles Android OAuth callback (?code= in URL).
  */
 
@@ -22,6 +23,12 @@ const notifToast       = document.getElementById('notif-toast');
 const notifErrorsOnly  = document.getElementById('notif-errors-only');
 const btnSaveNotif     = document.getElementById('btn-save-notif');
 const notifMsg         = document.getElementById('notif-msg');
+const autoSetReading   = document.getElementById('auto-set-reading');
+const autoSetCompleted = document.getElementById('auto-set-completed');
+const autoSetOnHold    = document.getElementById('auto-set-on-hold');
+const autoNeverChange  = document.getElementById('auto-never-change');
+const btnSaveAuto      = document.getElementById('btn-save-auto');
+const autoStatusMsg    = document.getElementById('auto-status-msg');
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -48,6 +55,13 @@ function showNotifMsg(type, text) {
   notifMsg.className     = `msg msg-${type}`;
   notifMsg.textContent   = text;
   notifMsg.style.display = 'block';
+}
+
+function showAutoMsg(type, text) {
+  if (!autoStatusMsg) return;
+  autoStatusMsg.className     = `msg msg-${type}`;
+  autoStatusMsg.textContent   = text;
+  autoStatusMsg.style.display = 'block';
 }
 
 // ─── Android OAuth callback ───────────────────────────────────────────────────
@@ -81,7 +95,6 @@ async function init() {
     if (cfg.ok) {
       clientIdInput.value = cfg.clientId;
 
-      // Desktop redirect URI (only available on desktop)
       if (cfg.firefoxRedirect) {
         uriFfEl.textContent = cfg.firefoxRedirect;
         if (uriFfRowEl) uriFfRowEl.style.display = '';
@@ -90,7 +103,6 @@ async function init() {
         if (uriFfRowEl) uriFfRowEl.style.display = 'none';
       }
 
-      // Android redirect URI
       if (uriAndroidEl) {
         uriAndroidEl.textContent = cfg.androidRedirect || '–';
       }
@@ -111,6 +123,15 @@ async function init() {
       if (notifBrowser)    notifBrowser.checked    = notifRes.settings.browserNotifications ?? true;
       if (notifToast)      notifToast.checked      = notifRes.settings.inPageToast          ?? true;
       if (notifErrorsOnly) notifErrorsOnly.checked = notifRes.settings.errorsOnly           ?? false;
+    }
+
+    // Load auto status settings
+    const autoRes = await sendMsg('GET_AUTO_STATUS_SETTINGS');
+    if (autoRes.ok && autoRes.settings) {
+      if (autoSetReading)   autoSetReading.checked   = autoRes.settings.setReading   ?? true;
+      if (autoSetCompleted) autoSetCompleted.checked = autoRes.settings.setCompleted ?? true;
+      if (autoSetOnHold)    autoSetOnHold.checked    = autoRes.settings.setOnHold    ?? true;
+      if (autoNeverChange)  autoNeverChange.checked  = autoRes.settings.neverChange  ?? false;
     }
   } catch (err) {
     showSaveMsg('err', `Failed to load: ${err.message}`);
@@ -147,9 +168,9 @@ btnSave.addEventListener('click', async () => {
 if (btnSaveNotif) {
   btnSaveNotif.addEventListener('click', async () => {
     const settings = {
-      browserNotifications: notifBrowser?.checked    ?? true,
-      inPageToast:          notifToast?.checked       ?? true,
-      errorsOnly:           notifErrorsOnly?.checked  ?? false,
+      browserNotifications: notifBrowser?.checked   ?? true,
+      inPageToast:          notifToast?.checked      ?? true,
+      errorsOnly:           notifErrorsOnly?.checked ?? false,
     };
 
     btnSaveNotif.disabled    = true;
@@ -164,6 +185,33 @@ if (btnSaveNotif) {
     } finally {
       btnSaveNotif.disabled    = false;
       btnSaveNotif.textContent = 'Save';
+    }
+  });
+}
+
+// ─── Save Auto Status Settings ────────────────────────────────────────────────
+
+if (btnSaveAuto) {
+  btnSaveAuto.addEventListener('click', async () => {
+    const settings = {
+      setReading:   autoSetReading?.checked   ?? true,
+      setCompleted: autoSetCompleted?.checked ?? true,
+      setOnHold:    autoSetOnHold?.checked    ?? true,
+      neverChange:  autoNeverChange?.checked  ?? false,
+    };
+
+    btnSaveAuto.disabled    = true;
+    btnSaveAuto.textContent = 'Saving…';
+
+    try {
+      const res = await sendMsg('SAVE_AUTO_STATUS_SETTINGS', { settings });
+      if (!res.ok) throw new Error(res.error ?? 'Save failed');
+      showAutoMsg('ok', '✅ Auto status settings saved.');
+    } catch (err) {
+      showAutoMsg('err', `Error: ${err.message}`);
+    } finally {
+      btnSaveAuto.disabled    = false;
+      btnSaveAuto.textContent = 'Save';
     }
   });
 }
