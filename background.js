@@ -689,6 +689,7 @@ async function syncChapter(slug, chapter, tabId = null, totalRoliaChapters = nul
         type:      'auto-status',
         manga:     slug,
         malTitle,
+        chapter:   null,
         status:    newStatus,
         trigger:   autoTrigger,
         timestamp: Date.now(),

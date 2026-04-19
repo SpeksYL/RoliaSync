@@ -131,7 +131,7 @@ function renderHistory(history) {
 
       const tdChapter = document.createElement('td');
       tdChapter.className   = 'td-chapter';
-      tdChapter.textContent = entry.trigger === 'first-chapter' ? 'Ch. 1' : 'Last ch.';
+      tdChapter.textContent = '–';
 
       const tdTime = document.createElement('td');
       tdTime.className   = 'td-time';
