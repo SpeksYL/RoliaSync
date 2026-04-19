@@ -82,38 +82,50 @@ function tryInitialSync() {
 // ─── Fetch interceptor (status changes via Rolia API) ────────────────────────
 
 function setupFetchInterceptor() {
-  const originalFetch = window.fetch;
-  window.fetch = async function (...args) {
-    const [url, options] = args;
-    if (
-      typeof url === 'string' &&
-      url.includes('/auth/manga-status') &&
-      options?.method === 'POST'
-    ) {
-      try {
-        const bodyText = typeof options.body === 'string'
-          ? options.body
-          : await new Response(options.body).text();
-        const bodyData = JSON.parse(bodyText);
-
-        // Extract slug from the current manga page URL
-        const slugMatch = window.location.pathname.match(/\/manga\/([\w-]+)\/?/);
-        const slug = slugMatch ? slugMatch[1] : null;
-
-        if (bodyData.status && slug) {
-          api.runtime.sendMessage({
-            action: 'ROLIA_STATUS_CHANGED',
-            data: {
-              slug:     slug,
-              manga_id: bodyData.manga_id,
-              status:   bodyData.status,
-            },
-          });
+  // Inject into page world (content scripts cannot override window.fetch directly)
+  const script = document.createElement('script');
+  script.textContent = `
+    (function() {
+      const originalFetch = window.fetch;
+      window.fetch = async function(...args) {
+        const [url, options] = args;
+        if (typeof url === 'string' &&
+            url.includes('/auth/manga-status') &&
+            options?.method === 'POST') {
+          try {
+            const bodyText = typeof options.body === 'string'
+              ? options.body
+              : await new Response(options.body).text();
+            const bodyData = JSON.parse(bodyText);
+            const slugMatch = window.location.pathname.match(
+              /\\/manga\\/([\\w-]+)\\/?/
+            );
+            const slug = slugMatch ? slugMatch[1] : null;
+            if (bodyData.status && slug) {
+              window.dispatchEvent(new CustomEvent('roliaStatusChanged', {
+                detail: {
+                  slug:     slug,
+                  manga_id: bodyData.manga_id,
+                  status:   bodyData.status,
+                }
+              }));
+            }
+          } catch(_e) {}
         }
-      } catch (_e) { /* ignore */ }
-    }
-    return originalFetch.apply(this, args);
-  };
+        return originalFetch.apply(this, args);
+      };
+    })();
+  `;
+  document.documentElement.appendChild(script);
+  script.remove();
+
+  // Receive the CustomEvent from page world and forward to background
+  window.addEventListener('roliaStatusChanged', (e) => {
+    api.runtime.sendMessage({
+      action: 'ROLIA_STATUS_CHANGED',
+      data:   e.detail,
+    });
+  });
 }
 
 // ─── Bookmarks sync (roliascan.com/bookmarks) ─────────────────────────────────
