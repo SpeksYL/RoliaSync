@@ -410,10 +410,18 @@ async function getNotificationSettings() {
 async function getAutoStatusSettings() {
   const { auto_status_settings } = await syncGet('auto_status_settings');
   return {
+    syncStatus:   auto_status_settings?.syncStatus   ?? true,
     setReading:   auto_status_settings?.setReading   ?? true,
     setCompleted: auto_status_settings?.setCompleted ?? true,
     setOnHold:    auto_status_settings?.setOnHold    ?? true,
     neverChange:  auto_status_settings?.neverChange  ?? false,
+  };
+}
+
+async function getGeneralSettings() {
+  const { general_settings } = await syncGet('general_settings');
+  return {
+    showImportButton: general_settings?.showImportButton ?? true,
   };
 }
 
@@ -773,12 +781,38 @@ api.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
       (async () => {
         try {
           const settings = {
+            syncStatus:   msg.settings?.syncStatus   ?? true,
             setReading:   msg.settings?.setReading   ?? true,
             setCompleted: msg.settings?.setCompleted ?? true,
             setOnHold:    msg.settings?.setOnHold    ?? true,
             neverChange:  msg.settings?.neverChange  ?? false,
           };
           await syncSet({ auto_status_settings: settings });
+          sendResponse({ ok: true });
+        } catch (err) {
+          sendResponse({ ok: false, error: err.message });
+        }
+      })();
+      return true;
+
+    case 'GET_GENERAL_SETTINGS':
+      (async () => {
+        try {
+          const settings = await getGeneralSettings();
+          sendResponse({ ok: true, settings });
+        } catch (err) {
+          sendResponse({ ok: false, error: err.message });
+        }
+      })();
+      return true;
+
+    case 'SAVE_GENERAL_SETTINGS':
+      (async () => {
+        try {
+          const settings = {
+            showImportButton: msg.settings?.showImportButton ?? true,
+          };
+          await syncSet({ general_settings: settings });
           sendResponse({ ok: true });
         } catch (err) {
           sendResponse({ ok: false, error: err.message });
@@ -925,6 +959,13 @@ api.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
     case 'ROLIA_STATUS_CHANGED':
       (async () => {
         try {
+          // Respect global status sync toggle
+          const autoSettings = await getAutoStatusSettings();
+          if (!autoSettings.syncStatus) {
+            sendResponse({ ok: true, skipped: true });
+            return;
+          }
+
           const { data } = msg;
 
           // Try multiple field names Rolia might use

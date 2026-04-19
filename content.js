@@ -211,64 +211,14 @@ function injectImportButton(manga) {
   document.body.appendChild(btn);
 }
 
-function observeStatusChanges() {
-  const grid = document.querySelector('#library-grid, .library-grid, main');
-  if (!grid) return;
+async function initBookmarksPage() {
+  // Check if import button is enabled in settings
+  const { general_settings } = await api.storage.sync.get('general_settings').catch(() => ({}));
+  const showImportButton = general_settings?.showImportButton ?? true;
+  if (!showImportButton) return;
 
-  // Debounce to avoid firing on intermediate DOM states
-  const pending = new Map(); // slug → newStatus
-  let flushTimer = null;
-
-  function flush() {
-    pending.forEach((status, slug) => {
-      api.runtime.sendMessage({ type: 'SYNC_STATUS', slug, status }, (res) => {
-        if (api.runtime.lastError) return;
-        if (res?.ok) showToast(`${slug}: status → ${status}`, 'success');
-      });
-    });
-    pending.clear();
-  }
-
-  function handleBadgeChange(badge) {
-    const group = badge.closest(
-      '[data-manga-id], .group, .manga-item, .manga-card, .library-item'
-    );
-    if (!group) return;
-
-    const link = group.querySelector('a.manga-link, a[href*="/manga/"]');
-    const href = link?.getAttribute('href') ?? '';
-    const slug = href.split('/').filter(Boolean).pop();
-    if (!slug || slug === 'manga') return;
-
-    pending.set(slug, normalizeRoliaStatus(badge.textContent));
-    clearTimeout(flushTimer);
-    flushTimer = setTimeout(flush, 800);
-  }
-
-  const observer = new MutationObserver((mutations) => {
-    for (const mutation of mutations) {
-      if (mutation.type === 'characterData') {
-        const el = mutation.target.parentElement;
-        if (el?.classList.contains('status-badge')) handleBadgeChange(el);
-      } else if (mutation.type === 'childList') {
-        for (const node of mutation.addedNodes) {
-          if (node.nodeType !== Node.ELEMENT_NODE) continue;
-          const badge = node.classList?.contains('status-badge')
-            ? node
-            : node.querySelector?.('span.status-badge');
-          if (badge) handleBadgeChange(badge);
-        }
-      }
-    }
-  });
-
-  observer.observe(grid, { subtree: true, characterData: true, childList: true });
-}
-
-function initBookmarksPage() {
   const manga = readBookmarksManga();
   if (manga.length > 0) injectImportButton(manga);
-  observeStatusChanges();
 
   // Re-scan after lazy-loaded content appears
   let scanTimer = null;

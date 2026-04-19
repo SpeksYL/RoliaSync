@@ -770,6 +770,23 @@
     </div>
 
     <div class="section">
+      <div class="section-title">Bookmarks page</div>
+
+      <div class="toggle-row">
+        <div>
+          <div class="toggle-label">Show Import button on bookmarks page</div>
+          <div class="toggle-hint">Displays the "Import to MAL" button on roliascan.com/bookmarks</div>
+        </div>
+        <input type="checkbox" id="show-import-button" checked />
+      </div>
+
+      <div class="btn-row">
+        <button class="btn btn-primary" id="btn-save-general">Save</button>
+      </div>
+      <div class="msg" id="general-msg"></div>
+    </div>
+
+    <div class="section">
       <div class="section-title">Useful links</div>
       <div class="link-row">
         <span>🔧</span>
@@ -823,6 +840,19 @@
 
   <!-- ═══ AUTO STATUS ═══════════════════════════════════════════════ -->
   <div class="tab-panel settings-panel" data-panel="auto-status">
+
+    <div class="section">
+      <div class="section-title">Status sync</div>
+
+      <div class="toggle-row">
+        <div>
+          <div class="toggle-label">Sync reading status to MAL</div>
+          <div class="toggle-hint">Mirror status changes from manga detail pages to MAL in real time</div>
+        </div>
+        <input type="checkbox" id="sync-status" checked />
+      </div>
+
+    </div>
 
     <div class="section">
       <div class="section-title">Auto status</div>
@@ -940,14 +970,14 @@
     <div id="mappings-pending-notice" style="display:none;" class="pending-notice">
       <div class="pn-label">⚠️ Unmatched slug — assign manually</div>
       <div class="pn-slug" id="pending-slug-display">–</div>
-      <div class="pn-hint">This slug was not found automatically on MAL. Search below and select the correct manga.</div>
+      <div class="pn-hint">Search MAL and select the correct entry for this manga.</div>
       <div id="pending-slug-edit"></div>
     </div>
 
     <div id="mappings-loading">Loading mappings…</div>
 
     <div id="mappings-empty" style="display:none;" class="mappings-empty">
-      No mappings saved yet.<br>They are created automatically when manga are synced.
+      No manual mappings yet.<br>Mappings are saved here when you assign a manga manually or correct an auto-match.
     </div>
 
     <div id="mappings-table-wrap" style="display:none;" class="mappings-table-wrap">

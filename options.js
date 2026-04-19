@@ -9,14 +9,17 @@
 const api = typeof browser !== 'undefined' ? browser : chrome;
 
 // ─── DOM refs — General ───────────────────────────────────────────────────────
-const clientIdInput    = document.getElementById('client-id-input');
-const btnSave          = document.getElementById('btn-save');
-const saveMsg          = document.getElementById('save-msg');
-const uriFfEl          = document.getElementById('uri-firefox');
-const uriAndroidEl     = document.getElementById('uri-android');
-const uriFfRowEl       = document.getElementById('uri-firefox-row');
-const statusUsername   = document.getElementById('status-username');
-const statusClientId   = document.getElementById('status-clientid');
+const clientIdInput      = document.getElementById('client-id-input');
+const btnSave            = document.getElementById('btn-save');
+const saveMsg            = document.getElementById('save-msg');
+const uriFfEl            = document.getElementById('uri-firefox');
+const uriAndroidEl       = document.getElementById('uri-android');
+const uriFfRowEl         = document.getElementById('uri-firefox-row');
+const statusUsername     = document.getElementById('status-username');
+const statusClientId     = document.getElementById('status-clientid');
+const showImportButtonEl = document.getElementById('show-import-button');
+const btnSaveGeneral     = document.getElementById('btn-save-general');
+const generalMsg         = document.getElementById('general-msg');
 
 // ─── DOM refs — Notifications ─────────────────────────────────────────────────
 const notifBrowser     = document.getElementById('notif-browser');
@@ -26,6 +29,7 @@ const btnSaveNotif     = document.getElementById('btn-save-notif');
 const notifMsg         = document.getElementById('notif-msg');
 
 // ─── DOM refs — Auto Status ───────────────────────────────────────────────────
+const syncStatusEl     = document.getElementById('sync-status');
 const autoSetReading   = document.getElementById('auto-set-reading');
 const autoSetCompleted = document.getElementById('auto-set-completed');
 const autoSetOnHold    = document.getElementById('auto-set-on-hold');
@@ -174,10 +178,16 @@ async function initGeneralTab() {
 
     const autoRes = await sendMsg('GET_AUTO_STATUS_SETTINGS');
     if (autoRes.ok && autoRes.settings) {
+      if (syncStatusEl)     syncStatusEl.checked     = autoRes.settings.syncStatus   ?? true;
       if (autoSetReading)   autoSetReading.checked   = autoRes.settings.setReading   ?? true;
       if (autoSetCompleted) autoSetCompleted.checked = autoRes.settings.setCompleted ?? true;
       if (autoSetOnHold)    autoSetOnHold.checked    = autoRes.settings.setOnHold    ?? true;
       if (autoNeverChange)  autoNeverChange.checked  = autoRes.settings.neverChange  ?? false;
+    }
+
+    const genRes = await sendMsg('GET_GENERAL_SETTINGS');
+    if (genRes.ok && genRes.settings) {
+      if (showImportButtonEl) showImportButtonEl.checked = genRes.settings.showImportButton ?? true;
     }
   } catch (err) {
     showMsg(saveMsg, 'err', `Failed to load settings: ${err.message}`);
@@ -208,6 +218,30 @@ btnSave.addEventListener('click', async () => {
     btnSave.textContent = 'Save';
   }
 });
+
+// ─── Save General Settings (import button toggle) ─────────────────────────────
+
+if (btnSaveGeneral) {
+  btnSaveGeneral.addEventListener('click', async () => {
+    const settings = {
+      showImportButton: showImportButtonEl?.checked ?? true,
+    };
+
+    btnSaveGeneral.disabled    = true;
+    btnSaveGeneral.textContent = 'Saving…';
+
+    try {
+      const res = await sendMsg('SAVE_GENERAL_SETTINGS', { settings });
+      if (!res.ok) throw new Error(res.error ?? 'Save failed');
+      showMsg(generalMsg, 'ok', '✅ Settings saved.');
+    } catch (err) {
+      showMsg(generalMsg, 'err', `Error: ${err.message}`);
+    } finally {
+      btnSaveGeneral.disabled    = false;
+      btnSaveGeneral.textContent = 'Save';
+    }
+  });
+}
 
 // ─── Save Notification Settings ───────────────────────────────────────────────
 
@@ -240,10 +274,11 @@ if (btnSaveNotif) {
 if (btnSaveAuto) {
   btnSaveAuto.addEventListener('click', async () => {
     const settings = {
-      setReading:   autoSetReading?.checked   ?? true,
-      setCompleted: autoSetCompleted?.checked ?? true,
-      setOnHold:    autoSetOnHold?.checked    ?? true,
-      neverChange:  autoNeverChange?.checked  ?? false,
+      syncStatus:   syncStatusEl?.checked      ?? true,
+      setReading:   autoSetReading?.checked    ?? true,
+      setCompleted: autoSetCompleted?.checked  ?? true,
+      setOnHold:    autoSetOnHold?.checked     ?? true,
+      neverChange:  autoNeverChange?.checked   ?? false,
     };
 
     btnSaveAuto.disabled    = true;
