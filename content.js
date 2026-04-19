@@ -63,13 +63,7 @@ function sendSync(parsed) {
       url:     parsed.url,
     },
     (response) => {
-      if (api.runtime.lastError) {
-        console.warn('[RoliaSync] Could not connect to background:', api.runtime.lastError.message);
-        return;
-      }
-      if (!response?.ok) {
-        console.warn('[RoliaSync] Sync failed:', response?.error);
-      }
+      if (api.runtime.lastError || !response?.ok) { /* ignore — background handles retry */ }
     }
   );
 }

@@ -564,7 +564,7 @@ async function syncChapter(slug, chapter, tabId = null) {
       return;
     }
 
-    console.warn(`[MAL Sync] Error, retrying in ${RETRY_DELAY_MS}ms:`, err.message);
+    // Retry after delay
     await new Promise(r => setTimeout(r, RETRY_DELAY_MS));
 
     try {
