@@ -293,8 +293,13 @@ document.querySelectorAll('.btn-copy').forEach(btn => {
  * onCancel() restores the original content.
  */
 function openInlineEdit(container, slug, onSave, onCancel) {
-  // Save original content to restore on cancel
-  const savedHtml = container.innerHTML;
+  // Save original children to restore on cancel
+  const savedNodes = Array.from(container.childNodes).map(n => n.cloneNode(true));
+
+  function restoreContainer() {
+    container.textContent = '';
+    savedNodes.forEach(n => container.appendChild(n.cloneNode(true)));
+  }
 
   container.textContent = '';
 
@@ -316,7 +321,7 @@ function openInlineEdit(container, slug, onSave, onCancel) {
   cancelBtn.textContent = '✕';
   cancelBtn.title       = 'Cancel';
   cancelBtn.addEventListener('click', () => {
-    container.innerHTML = savedHtml;
+    restoreContainer();
     if (onCancel) onCancel();
   });
 
@@ -351,7 +356,7 @@ function openInlineEdit(container, slug, onSave, onCancel) {
       runInlineSearch(input.value, results, slug, onSave, container);
     }
     if (e.key === 'Escape') {
-      container.innerHTML = savedHtml;
+      restoreContainer();
       if (onCancel) onCancel();
     }
   });

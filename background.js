@@ -898,6 +898,27 @@ api.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
   }
 });
 
+// ─── Temporary webRequest logger (debug) ─────────────────────────────────────
+
+browser.webRequest.onBeforeRequest.addListener(
+  (details) => {
+    if (details.method !== 'GET') {
+      browser.storage.local.get('requestLog').then(data => {
+        const log = data.requestLog || [];
+        log.push({
+          method: details.method,
+          url:    details.url,
+          body:   details.requestBody,
+          time:   new Date().toISOString(),
+        });
+        browser.storage.local.set({ requestLog: log });
+      });
+    }
+  },
+  { urls: ['*://*.roliascan.com/*'] },
+  ['requestBody']
+);
+
 // ─── First install: open settings page if Client ID is missing ────────────────
 
 api.runtime.onInstalled.addListener(async ({ reason }) => {

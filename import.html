@@ -5,10 +5,6 @@
   <title>RoliaSync – Import</title>
 </head>
 <body>
-  <script>
-    // Redirect to the Import tab in the unified settings page
-    const api = typeof browser !== 'undefined' ? browser : chrome;
-    window.location.replace(api.runtime.getURL('options.html') + '#import');
-  </script>
+  <script src="import-redirect.js"></script>
 </body>
 </html>

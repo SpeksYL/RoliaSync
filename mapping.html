@@ -5,12 +5,6 @@
   <title>RoliaSync – Mapping</title>
 </head>
 <body>
-  <script>
-    // Redirect to the Mappings tab, passing the slug as a query param
-    const api = typeof browser !== 'undefined' ? browser : chrome;
-    const slug = new URLSearchParams(window.location.search).get('slug') ?? '';
-    const base = api.runtime.getURL('options.html');
-    window.location.replace(base + (slug ? '?slug=' + encodeURIComponent(slug) : '') + '#mappings');
-  </script>
+  <script src="mapping-redirect.js"></script>
 </body>
 </html>
