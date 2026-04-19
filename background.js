@@ -482,12 +482,21 @@ async function getRoliaStatus(roliaId, tabId) {
   }
 }
 
-async function setRoliaStatus(roliaId, status, tabId) {
+// Slugs with an in-flight auto-status POST — prevents ROLIA_STATUS_CHANGED
+// from setting autoStatusLocks when background triggered the status change.
+const _autoStatusInProgress = new Set();
+
+async function setRoliaStatus(roliaId, status, tabId, slug = null) {
   if (!tabId) return;
+  if (slug) {
+    _autoStatusInProgress.add(slug);
+    setTimeout(() => _autoStatusInProgress.delete(slug), 5000);
+  }
   try {
     await api.tabs.sendMessage(tabId, {
-      action: 'SET_ROLIA_STATUS',
-      data:   { mangaId: roliaId, status },
+      action:       'SET_ROLIA_STATUS',
+      isAutoStatus: true,
+      data:         { mangaId: roliaId, status },
     });
   } catch { /* ignore */ }
 }
@@ -506,6 +515,16 @@ async function showNotification(type, message, tabId = null) {
 
   if (settings.errorsOnly && type === 'success') return;
 
+  // Toast is the primary notification — always show when we have a tab
+  if (settings.inPageToast && tabId != null) {
+    api.tabs.sendMessage(tabId, {
+      action:  'SHOW_TOAST',
+      message,
+      type:    type === 'success' ? 'success' : 'error',
+    }).catch(() => {});
+  }
+
+  // Browser notification is additional/optional
   if (settings.browserNotifications) {
     try {
       api.notifications.create({
@@ -515,14 +534,6 @@ async function showNotification(type, message, tabId = null) {
         message,
       });
     } catch { /* browser.notifications not available on this platform */ }
-  }
-
-  if (settings.inPageToast && tabId != null) {
-    api.tabs.sendMessage(tabId, {
-      action:  'SHOW_TOAST',
-      message,
-      type:    type === 'success' ? 'success' : 'error',
-    }).catch(() => {});
   }
 }
 
@@ -672,7 +683,7 @@ async function syncChapter(slug, chapter, tabId = null, totalRoliaChapters = nul
     // Sync status back to Rolia + record auto-status history entry
     if (autoTrigger && newStatus) {
       if (roliaId && autoSettings.syncStatusToRolia) {
-        await setRoliaStatus(roliaId, newStatus, tabId);
+        await setRoliaStatus(roliaId, newStatus, tabId, slug);
       }
       await addHistoryEntry({
         type:      'auto-status',
@@ -1176,11 +1187,14 @@ api.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
             timestamp: Date.now(),
           });
 
-          // Lock auto-status for this slug — user explicitly set a status
-          const { autoStatusLocks = [] } = await api.storage.local.get('autoStatusLocks');
-          if (!autoStatusLocks.includes(slug)) {
-            autoStatusLocks.push(slug);
-            await api.storage.local.set({ autoStatusLocks });
+          // Lock auto-status — but only for user-initiated status changes,
+          // not when background.js itself triggered the Rolia POST.
+          if (!_autoStatusInProgress.has(slug)) {
+            const { autoStatusLocks = [] } = await api.storage.local.get('autoStatusLocks');
+            if (!autoStatusLocks.includes(slug)) {
+              autoStatusLocks.push(slug);
+              await api.storage.local.set({ autoStatusLocks });
+            }
           }
 
           sendResponse({ ok: true });

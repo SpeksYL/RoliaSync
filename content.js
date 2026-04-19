@@ -63,15 +63,19 @@ api.runtime.onMessage.addListener((msg) => {
   }
 
   if (msg.action === 'GET_MANGA_META') {
-    return fetch(`https://roliascan.com/manga/${msg.slug}/`, { credentials: 'include' })
+    const url = `https://roliascan.com/manga/${encodeURIComponent(msg.slug)}/`;
+    return fetch(url, { credentials: 'include' })
       .then(r => r.text())
       .then(html => {
-        const isOngoing  = /Ongoing/i.test(html);
-        const isFinished = /Finished|Completed/i.test(html) && !isOngoing;
+        const isOngoing  = /Ongoing|ongoing/.test(html);
+        const isFinished = /Finished|Completed|finished|completed/.test(html) && !isOngoing;
         const chapMatch  = html.match(/(\d+)\s+ch(?:apter)?s?\b/i);
         const totalChapters = chapMatch ? parseInt(chapMatch[1], 10) : null;
         const idMatch  = html.match(/data-manga-id="(\d+)"/);
         const roliaId  = idMatch ? idMatch[1] : null;
+        console.error('[RoliaSync] Live meta raw:', html.substring(0, 500));
+        console.error('[RoliaSync] isFinished:', isFinished, 'isOngoing:', isOngoing,
+          'totalChapters:', totalChapters, 'roliaId:', roliaId);
         return { isOngoing, isFinished, totalChapters, roliaId };
       })
       .catch(() => null);
