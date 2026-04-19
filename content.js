@@ -63,20 +63,38 @@ api.runtime.onMessage.addListener((msg) => {
   }
 
   if (msg.action === 'GET_MANGA_META') {
-    const url = `https://roliascan.com/manga/${encodeURIComponent(msg.slug)}/`;
-    return fetch(url, { credentials: 'include' })
+    return fetch(`https://roliascan.com/manga/${msg.slug}/`, { credentials: 'include' })
       .then(r => r.text())
       .then(html => {
-        const isOngoing  = /Ongoing|ongoing/.test(html);
-        const isFinished = /Finished|Completed|finished|completed/.test(html) && !isOngoing;
-        const chapMatch  = html.match(/(\d+)\s+ch(?:apter)?s?\b/i);
-        const totalChapters = chapMatch ? parseInt(chapMatch[1], 10) : null;
-        const idMatch  = html.match(/data-manga-id="(\d+)"/);
-        const roliaId  = idMatch ? idMatch[1] : null;
-        console.error('[RoliaSync] Live meta raw:', html.substring(0, 500));
-        console.error('[RoliaSync] isFinished:', isFinished, 'isOngoing:', isOngoing,
-          'totalChapters:', totalChapters, 'roliaId:', roliaId);
-        return { isOngoing, isFinished, totalChapters, roliaId };
+        let isFinished    = false;
+        let isOngoing     = false;
+        let totalChapters = 0;
+
+        // Parse JSON-LD — reliable structured source
+        const jsonLdMatch = html.match(
+          /<script[^>]+type="application\/ld\+json"[^>]*>([\s\S]*?)<\/script>/gi
+        );
+        if (jsonLdMatch) {
+          for (const script of jsonLdMatch) {
+            try {
+              const content = script.replace(/<\/?script[^>]*>/gi, '');
+              const data    = JSON.parse(content);
+              if (data['@type'] === 'ComicSeries') {
+                isFinished    = data.status === 'Completed';
+                isOngoing     = data.status === 'Ongoing';
+                totalChapters = data.numberOfEpisodes || 0;
+                break;
+              }
+            } catch (_e) {}
+          }
+        }
+
+        const idMatch = html.match(/data-manga-id="(\d+)"/);
+        const roliaId = idMatch ? idMatch[1] : null;
+
+        console.error('[RoliaSync] Live meta — isFinished:', isFinished,
+          'isOngoing:', isOngoing, 'totalChapters:', totalChapters, 'roliaId:', roliaId);
+        return { isFinished, isOngoing, totalChapters, roliaId };
       })
       .catch(() => null);
   }
