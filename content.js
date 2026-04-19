@@ -34,9 +34,33 @@ function showToast(message, type = 'success') {
   setTimeout(() => toast.remove(), 4000);
 }
 
-api.runtime.onMessage.addListener((msg) => {
+api.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
   if (msg.action === 'SHOW_TOAST') {
     showToast(msg.message, msg.type ?? 'success');
+    return;
+  }
+
+  if (msg.action === 'GET_ROLIA_STATUS') {
+    fetch(
+      `https://roliascan.com/auth/manga-status?manga_id=${msg.data.mangaId}`,
+      { credentials: 'include' }
+    )
+      .then(r => r.ok ? r.json() : null)
+      .then(data => sendResponse({ status: data?.status ?? null }))
+      .catch(() => sendResponse({ status: null }));
+    return true; // async
+  }
+
+  if (msg.action === 'SET_ROLIA_STATUS') {
+    fetch('https://roliascan.com/auth/manga-status', {
+      method:      'POST',
+      credentials: 'include',
+      headers:     { 'Content-Type': 'application/json' },
+      body:        JSON.stringify({ manga_id: msg.data.mangaId, status: msg.data.status }),
+    })
+      .then(r => sendResponse({ ok: r.ok }))
+      .catch(() => sendResponse({ ok: false }));
+    return true; // async
   }
 });
 

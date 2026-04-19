@@ -30,9 +30,6 @@ const notifMsg         = document.getElementById('notif-msg');
 
 // ─── DOM refs — Auto Status ───────────────────────────────────────────────────
 const syncStatusEl        = document.getElementById('sync-status');
-const autoSetReading      = document.getElementById('auto-set-reading');
-const autoSetCompleted    = document.getElementById('auto-set-completed');
-const autoSetOnHold       = document.getElementById('auto-set-on-hold');
 const autoNeverChange     = document.getElementById('auto-never-change');
 const autoStatusReadingEl = document.getElementById('auto-status-reading');
 const autoStatusOnHoldEl  = document.getElementById('auto-status-on-hold');
@@ -183,9 +180,6 @@ async function initGeneralTab() {
     const autoRes = await sendMsg('GET_AUTO_STATUS_SETTINGS');
     if (autoRes.ok && autoRes.settings) {
       if (syncStatusEl)          syncStatusEl.checked          = autoRes.settings.syncStatus         ?? true;
-      if (autoSetReading)        autoSetReading.checked        = autoRes.settings.setReading         ?? true;
-      if (autoSetCompleted)      autoSetCompleted.checked      = autoRes.settings.setCompleted       ?? true;
-      if (autoSetOnHold)         autoSetOnHold.checked         = autoRes.settings.setOnHold          ?? true;
       if (autoNeverChange)       autoNeverChange.checked       = autoRes.settings.neverChange        ?? false;
       if (autoStatusReadingEl)   autoStatusReadingEl.checked   = autoRes.settings.autoStatusReading  ?? true;
       if (autoStatusOnHoldEl)    autoStatusOnHoldEl.checked    = autoRes.settings.autoStatusOnHold   ?? true;
@@ -283,9 +277,6 @@ if (btnSaveAuto) {
   btnSaveAuto.addEventListener('click', async () => {
     const settings = {
       syncStatus:         syncStatusEl?.checked         ?? true,
-      setReading:         autoSetReading?.checked       ?? true,
-      setCompleted:       autoSetCompleted?.checked     ?? true,
-      setOnHold:          autoSetOnHold?.checked        ?? true,
       neverChange:        autoNeverChange?.checked      ?? false,
       autoStatusReading:  autoStatusReadingEl?.checked  ?? true,
       autoStatusOnHold:   autoStatusOnHoldEl?.checked   ?? true,

@@ -417,47 +417,41 @@ async function getNotificationSettings() {
 
 async function getAutoStatusSettings() {
   const { auto_status_settings } = await syncGet('auto_status_settings');
+  const s = auto_status_settings ?? {};
   return {
-    syncStatus:         auto_status_settings?.syncStatus         ?? true,
-    setReading:         auto_status_settings?.setReading         ?? true,
-    setCompleted:       auto_status_settings?.setCompleted       ?? true,
-    setOnHold:          auto_status_settings?.setOnHold          ?? true,
-    neverChange:        auto_status_settings?.neverChange        ?? false,
-    autoStatusReading:  auto_status_settings?.autoStatusReading  ?? true,
-    autoStatusOnHold:   auto_status_settings?.autoStatusOnHold   ?? true,
-    autoStatusComplete: auto_status_settings?.autoStatusComplete ?? true,
-    syncStatusToRolia:  auto_status_settings?.syncStatusToRolia  ?? true,
+    syncStatus:         s.syncStatus         ?? true,
+    neverChange:        s.neverChange        ?? false,
+    // Migrate old keys → new keys so saved preferences are preserved
+    autoStatusReading:  s.autoStatusReading  ?? s.setReading   ?? true,
+    autoStatusOnHold:   s.autoStatusOnHold   ?? s.setOnHold    ?? true,
+    autoStatusComplete: s.autoStatusComplete ?? s.setCompleted ?? true,
+    syncStatusToRolia:  s.syncStatusToRolia  ?? true,
   };
 }
 
-// ─── Rolia status API ─────────────────────────────────────────────────────────
+// ─── Rolia status API (proxied via content.js — credentialed fetch) ───────────
 
-async function getRoliaStatus(roliaId) {
+async function getRoliaStatus(roliaId, tabId) {
+  if (!tabId) return null;
   try {
-    const res = await fetch(
-      `https://roliascan.com/auth/manga-status?manga_id=${roliaId}`,
-      { credentials: 'include' }
-    );
-    if (!res.ok) return null;
-    const data = await res.json();
-    return data.status ?? null;
+    const res = await api.tabs.sendMessage(tabId, {
+      action: 'GET_ROLIA_STATUS',
+      data:   { mangaId: roliaId },
+    });
+    return res?.status ?? null;
   } catch {
     return null;
   }
 }
 
-async function setRoliaStatus(roliaId, status) {
+async function setRoliaStatus(roliaId, status, tabId) {
+  if (!tabId) return;
   try {
-    const res = await fetch('https://roliascan.com/auth/manga-status', {
-      method:      'POST',
-      credentials: 'include',
-      headers:     { 'Content-Type': 'application/json' },
-      body:        JSON.stringify({ manga_id: roliaId, status }),
+    await api.tabs.sendMessage(tabId, {
+      action: 'SET_ROLIA_STATUS',
+      data:   { mangaId: roliaId, status },
     });
-    return res.ok;
-  } catch {
-    return false;
-  }
+  } catch { /* ignore */ }
 }
 
 async function getGeneralSettings() {
@@ -589,15 +583,8 @@ async function syncChapter(slug, chapter, tabId = null) {
       const locked = autoStatusLocks.includes(slug);
 
       if (!locked) {
-        if (isFirstRead && autoSettings.autoStatusReading) {
-          const roliaStatus = roliaId ? await getRoliaStatus(roliaId) : null;
-          if (info.listStatus === null && (roliaStatus === null || roliaStatus === 'plan_to_read')) {
-            newStatus   = 'reading';
-            autoTrigger = 'first-chapter';
-          }
-        }
-
-        if (isLastChapter && !autoTrigger) {
+        // Last chapter takes priority over first-chapter reading
+        if (isLastChapter) {
           if (mangaFinished && autoSettings.autoStatusComplete) {
             newStatus   = 'completed';
             autoTrigger = 'last-chapter';
@@ -606,14 +593,13 @@ async function syncChapter(slug, chapter, tabId = null) {
             autoTrigger = 'last-chapter';
           }
         }
-      }
 
-      // Fallback to legacy settings if new ones didn't fire
-      if (!autoTrigger) {
-        if (isFirstRead && autoSettings.setReading)   newStatus = 'reading';
-        if (isLastChapter) {
-          if (malFinished && autoSettings.setCompleted)  newStatus = 'completed';
-          else if (!malFinished && autoSettings.setOnHold) newStatus = 'on_hold';
+        if (!autoTrigger && isFirstRead && autoSettings.autoStatusReading) {
+          const roliaStatus = roliaId ? await getRoliaStatus(roliaId, tabId) : null;
+          if (info.listStatus === null && (roliaStatus === null || roliaStatus === 'plan_to_read')) {
+            newStatus   = 'reading';
+            autoTrigger = 'first-chapter';
+          }
         }
       }
     }
@@ -631,7 +617,7 @@ async function syncChapter(slug, chapter, tabId = null) {
     // Sync status back to Rolia + record auto-status history entry
     if (autoTrigger && newStatus) {
       if (roliaId && autoSettings.syncStatusToRolia) {
-        await setRoliaStatus(roliaId, newStatus);
+        await setRoliaStatus(roliaId, newStatus, tabId);
       }
       await addHistoryEntry({
         type:      'auto-status',
@@ -866,9 +852,6 @@ api.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
         try {
           const settings = {
             syncStatus:         msg.settings?.syncStatus         ?? true,
-            setReading:         msg.settings?.setReading         ?? true,
-            setCompleted:       msg.settings?.setCompleted       ?? true,
-            setOnHold:          msg.settings?.setOnHold          ?? true,
             neverChange:        msg.settings?.neverChange        ?? false,
             autoStatusReading:  msg.settings?.autoStatusReading  ?? true,
             autoStatusOnHold:   msg.settings?.autoStatusOnHold   ?? true,
