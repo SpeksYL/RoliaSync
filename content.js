@@ -273,6 +273,11 @@ function initBookmarksPage() {
 
 const _href = window.location.href;
 
+const isMangaPage = /roliascan\.com\/manga\/[\w-]+\/?$/.test(_href);
+if (isMangaPage) {
+  setupFetchInterceptor();
+}
+
 if (/roliascan\.com\/read\//.test(_href)) {
   // Initial sync
   if (document.readyState === 'complete') {
@@ -299,7 +304,6 @@ if (/roliascan\.com\/read\//.test(_href)) {
   chapterObserver.observe(document.body, { childList: true, subtree: true });
 
 } else if (/roliascan\.com\/bookmarks/.test(_href)) {
-  setupFetchInterceptor();
   if (document.readyState === 'complete') {
     initBookmarksPage();
   } else {
