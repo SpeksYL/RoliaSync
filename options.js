@@ -761,13 +761,13 @@ async function loadMappings() {
     mappingsTableWrap.style.display = 'block';
 
     entries.sort(([a], [b]) => a.localeCompare(b));
-    entries.forEach(([slug, { id, title }]) => renderMappingRow(slug, id, title));
+    entries.forEach(([slug, m]) => renderMappingRow(slug, m.id, m.title, m.syncEnabled !== false));
   } catch (err) {
     mappingsLoading.textContent = `Failed to load: ${err.message}`;
   }
 }
 
-function renderMappingRow(slug, malId, malTitle) {
+function renderMappingRow(slug, malId, malTitle, syncEnabled = true) {
   const tr = document.createElement('tr');
   tr.id = `mapping-row-${CSS.escape(slug)}`;
 
@@ -784,6 +784,19 @@ function renderMappingRow(slug, malId, malTitle) {
   tdId.className   = 'td-mal-id';
   tdId.id          = `mapping-id-${CSS.escape(slug)}`;
   tdId.textContent = malId;
+
+  // Sync toggle
+  const tdSync = document.createElement('td');
+  tdSync.className = 'td-sync';
+  const syncToggle = document.createElement('input');
+  syncToggle.type    = 'checkbox';
+  syncToggle.checked = syncEnabled;
+  syncToggle.title   = syncEnabled ? 'Sync enabled' : 'Sync disabled';
+  syncToggle.addEventListener('change', async () => {
+    syncToggle.title = syncToggle.checked ? 'Sync enabled' : 'Sync disabled';
+    await sendMsg('SET_SYNC_ENABLED', { slug, enabled: syncToggle.checked });
+  });
+  tdSync.appendChild(syncToggle);
 
   const tdActions = document.createElement('td');
   tdActions.className = 'td-actions';
@@ -834,6 +847,7 @@ function renderMappingRow(slug, malId, malTitle) {
   tr.appendChild(tdSlug);
   tr.appendChild(tdTitle);
   tr.appendChild(tdId);
+  tr.appendChild(tdSync);
   tr.appendChild(tdActions);
   mappingsBody.appendChild(tr);
 }

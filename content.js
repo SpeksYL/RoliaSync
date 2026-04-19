@@ -79,6 +79,34 @@ function tryInitialSync() {
   if (parsed) sendSync(parsed);
 }
 
+// ─── Fetch interceptor (status changes via Rolia API) ────────────────────────
+
+function setupFetchInterceptor() {
+  const originalFetch = window.fetch;
+  window.fetch = async function (...args) {
+    const [url, options] = args;
+    if (
+      typeof url === 'string' &&
+      url.includes('/auth/manga-status') &&
+      options?.method === 'POST'
+    ) {
+      try {
+        const bodyText =
+          options.body instanceof ReadableStream
+            ? null
+            : typeof options.body === 'string'
+              ? options.body
+              : await new Response(options.body).text();
+        const bodyData = bodyText ? JSON.parse(bodyText) : null;
+        if (bodyData) {
+          api.runtime.sendMessage({ action: 'ROLIA_STATUS_CHANGED', data: bodyData });
+        }
+      } catch (_e) { /* ignore */ }
+    }
+    return originalFetch.apply(this, args);
+  };
+}
+
 // ─── Bookmarks sync (roliascan.com/bookmarks) ─────────────────────────────────
 
 function normalizeRoliaStatus(raw) {
@@ -271,6 +299,7 @@ if (/roliascan\.com\/read\//.test(_href)) {
   chapterObserver.observe(document.body, { childList: true, subtree: true });
 
 } else if (/roliascan\.com\/bookmarks/.test(_href)) {
+  setupFetchInterceptor();
   if (document.readyState === 'complete') {
     initBookmarksPage();
   } else {

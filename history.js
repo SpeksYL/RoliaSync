@@ -115,6 +115,43 @@ function renderHistory(history) {
 
   historyBody.textContent = '';
   history.forEach(entry => {
+    // Status-change entries have their own row layout
+    if (entry.type === 'status') {
+      const tr = document.createElement('tr');
+
+      const tdTitle = document.createElement('td');
+      tdTitle.className   = 'td-title';
+      tdTitle.textContent = entry.malTitle ?? entry.manga ?? '–';
+      if (entry.manga) {
+        const slugDiv = document.createElement('div');
+        slugDiv.className   = 'slug';
+        slugDiv.textContent = entry.manga;
+        tdTitle.appendChild(slugDiv);
+      }
+
+      const tdChapter = document.createElement('td');
+      tdChapter.className   = 'td-chapter';
+      tdChapter.textContent = '–';
+
+      const tdTime = document.createElement('td');
+      tdTime.className   = 'td-time';
+      tdTime.title       = absoluteTime(entry.timestamp);
+      tdTime.textContent = relativeTime(entry.timestamp);
+
+      const tdStatus = document.createElement('td');
+      const badge = document.createElement('span');
+      badge.className   = 'status-badge status-changed';
+      badge.textContent = `🔄 ${entry.oldStatus ?? '?'} → ${entry.newStatus ?? '?'}`;
+      tdStatus.appendChild(badge);
+
+      tr.appendChild(tdTitle);
+      tr.appendChild(tdChapter);
+      tr.appendChild(tdTime);
+      tr.appendChild(tdStatus);
+      historyBody.appendChild(tr);
+      return;
+    }
+
     const title = entry.malTitle ?? entry.manga ?? '–';
     const slug  = entry.manga ?? '';
 

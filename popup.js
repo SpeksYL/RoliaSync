@@ -164,11 +164,5 @@ btnHistory.addEventListener('click', () => {
   window.close();
 });
 
-document.getElementById('btn-show-logs').addEventListener('click', async () => {
-  const data = await api.storage.local.get('requestLog');
-  const logs = data.requestLog ?? [];
-  alert(JSON.stringify(logs, null, 2));
-});
-
 // Start
 init();

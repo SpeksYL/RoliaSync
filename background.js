@@ -462,6 +462,10 @@ api.notifications.onClicked.addListener((notificationId) => {
 // ─── Sync logic ───────────────────────────────────────────────────────────────
 
 async function syncChapter(slug, chapter, tabId = null) {
+  // Respect per-manga sync toggle
+  const { slugMappings: _sm = {} } = await syncGet('slugMappings');
+  if (_sm[slug]?.syncEnabled === false) return;
+
   const chapterNum = Number(chapter);
 
   const { last_sync } = await api.storage.local.get('last_sync');
@@ -871,6 +875,12 @@ api.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
     case 'SYNC_STATUS':
       (async () => {
         try {
+          const { slugMappings: smSync = {} } = await syncGet('slugMappings');
+          if (smSync[msg.slug]?.syncEnabled === false) {
+            sendResponse({ ok: true, skipped: true });
+            return;
+          }
+
           let malId = msg.malId ?? null;
           let malTitle = null;
 
@@ -880,12 +890,114 @@ api.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
             malTitle = found.malTitle;
           }
 
+          // Only PATCH if status actually changed
+          const info = await getMalMangaInfo(malId);
+          if (info.listStatus === msg.status) {
+            sendResponse({ ok: true, skipped: true, reason: 'status unchanged' });
+            return;
+          }
+          const oldStatus = info.listStatus;
+
           const res = await malRequest(
             'PATCH',
             `/manga/${malId}/my_list_status`,
             { status: msg.status }
           );
           if (!res.ok) throw new Error(`Status sync failed: ${res.status}`);
+
+          await addHistoryEntry({
+            type:      'status',
+            manga:     msg.slug,
+            malTitle,
+            oldStatus,
+            newStatus: msg.status,
+            timestamp: Date.now(),
+          });
+
+          sendResponse({ ok: true });
+        } catch (err) {
+          sendResponse({ ok: false, error: err.message });
+        }
+      })();
+      return true;
+
+    // Status change intercepted from Rolia's own fetch call
+    case 'ROLIA_STATUS_CHANGED':
+      (async () => {
+        try {
+          const { data } = msg;
+
+          // Try multiple field names Rolia might use
+          const slug       = data.slug ?? data.mangaSlug ?? data.manga_slug ?? null;
+          const roliaStatus = data.status ?? data.manga_status ?? null;
+
+          if (!slug || !roliaStatus) {
+            sendResponse({ ok: false, error: 'Missing slug or status in body' });
+            return;
+          }
+
+          // Respect per-manga sync toggle
+          const { slugMappings: smRolia = {} } = await syncGet('slugMappings');
+          if (smRolia[slug]?.syncEnabled === false) {
+            sendResponse({ ok: true, skipped: true });
+            return;
+          }
+
+          const statusMap = {
+            reading:      'reading',
+            completed:    'completed',
+            on_hold:      'on_hold',
+            dropped:      'dropped',
+            plan_to_read: 'plan_to_read',
+          };
+          const mappedStatus = statusMap[roliaStatus];
+          if (!mappedStatus) {
+            sendResponse({ ok: false, error: `Unknown status: ${roliaStatus}` });
+            return;
+          }
+
+          const { malId, malTitle } = await getMalId(slug);
+
+          // Only PATCH if status actually changed
+          const info = await getMalMangaInfo(malId);
+          if (info.listStatus === mappedStatus) {
+            sendResponse({ ok: true, skipped: true, reason: 'status unchanged' });
+            return;
+          }
+          const oldStatus = info.listStatus;
+
+          const res = await malRequest(
+            'PATCH',
+            `/manga/${malId}/my_list_status`,
+            { status: mappedStatus }
+          );
+          if (!res.ok) throw new Error(`MAL status update failed: ${res.status}`);
+
+          await addHistoryEntry({
+            type:      'status',
+            manga:     slug,
+            malTitle,
+            oldStatus,
+            newStatus: mappedStatus,
+            timestamp: Date.now(),
+          });
+
+          sendResponse({ ok: true });
+        } catch (err) {
+          sendResponse({ ok: false, error: err.message });
+        }
+      })();
+      return true;
+
+    // Toggle per-manga sync on/off
+    case 'SET_SYNC_ENABLED':
+      (async () => {
+        try {
+          const { slugMappings = {} } = await syncGet('slugMappings');
+          if (slugMappings[msg.slug]) {
+            slugMappings[msg.slug].syncEnabled = msg.enabled;
+            await syncSet({ slugMappings });
+          }
           sendResponse({ ok: true });
         } catch (err) {
           sendResponse({ ok: false, error: err.message });
@@ -897,27 +1009,6 @@ api.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
       sendResponse({ ok: false, error: 'Unknown message type' });
   }
 });
-
-// ─── Temporary webRequest logger (debug) ─────────────────────────────────────
-
-browser.webRequest.onBeforeRequest.addListener(
-  (details) => {
-    if (details.method !== 'GET') {
-      browser.storage.local.get('requestLog').then(data => {
-        const log = data.requestLog || [];
-        log.push({
-          method: details.method,
-          url:    details.url,
-          body:   details.requestBody,
-          time:   new Date().toISOString(),
-        });
-        browser.storage.local.set({ requestLog: log });
-      });
-    }
-  },
-  { urls: ['*://*.roliascan.com/*'] },
-  ['requestBody']
-);
 
 // ─── First install: open settings page if Client ID is missing ────────────────
 
