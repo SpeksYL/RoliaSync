@@ -40,10 +40,10 @@ api.runtime.onMessage.addListener((msg) => {
   }
 });
 
-// ─── Rolia status proxy (all roliascan.com pages) ─────────────────────────────
+// ─── Rolia proxy (all roliascan.com pages) ────────────────────────────────────
 // background.js cannot make credentialed requests to roliascan.com,
-// so it delegates here via tabs.sendMessage. Return a Promise so Firefox
-// forwards the resolved value as the response automatically.
+// so it delegates here via tabs.sendMessage. Returning a Promise lets Firefox
+// forward the resolved value as the response automatically.
 
 api.runtime.onMessage.addListener((msg) => {
   if (msg.action === 'GET_ROLIA_STATUS') {
@@ -60,6 +60,21 @@ api.runtime.onMessage.addListener((msg) => {
       headers:     { 'Content-Type': 'application/json' },
       body:        JSON.stringify({ manga_id: msg.data.mangaId, status: msg.data.status }),
     }).then(r => r.json()).catch(() => ({ ok: false }));
+  }
+
+  if (msg.action === 'GET_MANGA_META') {
+    return fetch(`https://roliascan.com/manga/${msg.slug}/`, { credentials: 'include' })
+      .then(r => r.text())
+      .then(html => {
+        const isOngoing  = /Ongoing/i.test(html);
+        const isFinished = /Finished|Completed/i.test(html) && !isOngoing;
+        const chapMatch  = html.match(/(\d+)\s+ch(?:apter)?s?\b/i);
+        const totalChapters = chapMatch ? parseInt(chapMatch[1], 10) : null;
+        const idMatch  = html.match(/data-manga-id="(\d+)"/);
+        const roliaId  = idMatch ? idMatch[1] : null;
+        return { isOngoing, isFinished, totalChapters, roliaId };
+      })
+      .catch(() => null);
   }
 });
 

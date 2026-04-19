@@ -429,6 +429,44 @@ async function getAutoStatusSettings() {
   };
 }
 
+// ─── Manga meta — live fetch + cache write ────────────────────────────────────
+
+async function getMangaMetaLive(slug, tabId) {
+  if (!tabId) return null;
+  try {
+    const res = await api.tabs.sendMessage(tabId, { action: 'GET_MANGA_META', slug });
+    if (!res) return null;
+    return {
+      roliaId:       res.roliaId ? Number(res.roliaId) : null,
+      isOngoing:     res.isOngoing  ?? null,
+      isFinished:    res.isFinished ?? null,
+      totalChapters: res.totalChapters ?? null,
+    };
+  } catch {
+    return null;
+  }
+}
+
+async function saveMangaMetaToCache(slug, meta) {
+  try {
+    const { slugMappings = {} } = await syncGet('slugMappings');
+    if (slugMappings[slug]) {
+      if (meta.roliaId   != null) slugMappings[slug].roliaId   = meta.roliaId;
+      if (meta.isOngoing != null) slugMappings[slug].isOngoing = meta.isOngoing;
+      if (meta.isFinished!= null) slugMappings[slug].isFinished= meta.isFinished;
+      await syncSet({ slugMappings });
+    } else {
+      const { mangaMeta = {} } = await api.storage.local.get('mangaMeta');
+      mangaMeta[slug] = {
+        roliaId:    meta.roliaId,
+        isOngoing:  meta.isOngoing,
+        isFinished: meta.isFinished,
+      };
+      await api.storage.local.set({ mangaMeta });
+    }
+  } catch { /* non-fatal */ }
+}
+
 // ─── Rolia status API (proxied via content.js — credentialed fetch) ───────────
 
 async function getRoliaStatus(roliaId, tabId) {
@@ -573,17 +611,27 @@ async function syncChapter(slug, chapter, tabId = null, totalRoliaChapters = nul
 
     const isFirstRead = currentChapter === 0;
 
+    // Load manga meta — prefer cached mapping fields, otherwise fetch live
+    const hasCachedMeta = mapping.isFinished != null || mapping.isOngoing != null;
+    let liveMeta = null;
+    if (!hasCachedMeta) {
+      liveMeta = await getMangaMetaLive(slug, tabId);
+      if (liveMeta) await saveMangaMetaToCache(slug, liveMeta);
+    }
+
+    const malFinished   = info.malStatus === 'finished';
+    const mangaFinished = (liveMeta ?? mapping).isFinished ?? malFinished;
+    const mangaOngoing  = (liveMeta ?? mapping).isOngoing  ?? !malFinished;
+    const roliaId       = (liveMeta ?? mapping).roliaId    ?? null;
+
     // isLastChapter: use the lower of MAL total and Rolia total so that
     // specials/extras on MAL (e.g. MAL=170, Rolia=167) don't delay On Hold/Completed.
     const malTotal   = info.numChapters > 0 ? info.numChapters : null;
-    const roliaTotal = totalRoliaChapters > 0 ? totalRoliaChapters : null;
+    const roliaTotal = (liveMeta?.totalChapters > 0 ? liveMeta.totalChapters : null)
+                    ?? (totalRoliaChapters > 0 ? totalRoliaChapters : null);
     const minTotal   = (malTotal && roliaTotal) ? Math.min(malTotal, roliaTotal)
                      : (malTotal ?? roliaTotal ?? null);
     const isLastChapter = minTotal !== null && chapterNum >= minTotal;
-    const malFinished   = info.malStatus === 'finished';
-    const mangaFinished = mapping.isFinished ?? malFinished;
-    const mangaOngoing  = mapping.isOngoing  ?? !malFinished;
-    const roliaId       = mapping.roliaId    ?? null;
 
     if (!autoSettings.neverChange) {
       const { autoStatusLocks = [] } = await api.storage.local.get('autoStatusLocks');
