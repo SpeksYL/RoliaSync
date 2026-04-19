@@ -91,15 +91,24 @@ function setupFetchInterceptor() {
       options?.method === 'POST'
     ) {
       try {
-        const bodyText =
-          options.body instanceof ReadableStream
-            ? null
-            : typeof options.body === 'string'
-              ? options.body
-              : await new Response(options.body).text();
-        const bodyData = bodyText ? JSON.parse(bodyText) : null;
-        if (bodyData) {
-          api.runtime.sendMessage({ action: 'ROLIA_STATUS_CHANGED', data: bodyData });
+        const bodyText = typeof options.body === 'string'
+          ? options.body
+          : await new Response(options.body).text();
+        const bodyData = JSON.parse(bodyText);
+
+        // Extract slug from the current manga page URL
+        const slugMatch = window.location.pathname.match(/\/manga\/([\w-]+)\/?/);
+        const slug = slugMatch ? slugMatch[1] : null;
+
+        if (bodyData.status && slug) {
+          api.runtime.sendMessage({
+            action: 'ROLIA_STATUS_CHANGED',
+            data: {
+              slug:     slug,
+              manga_id: bodyData.manga_id,
+              status:   bodyData.status,
+            },
+          });
         }
       } catch (_e) { /* ignore */ }
     }
