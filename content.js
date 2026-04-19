@@ -34,33 +34,32 @@ function showToast(message, type = 'success') {
   setTimeout(() => toast.remove(), 4000);
 }
 
-api.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
+api.runtime.onMessage.addListener((msg) => {
   if (msg.action === 'SHOW_TOAST') {
     showToast(msg.message, msg.type ?? 'success');
-    return;
   }
+});
 
+// ─── Rolia status proxy (all roliascan.com pages) ─────────────────────────────
+// background.js cannot make credentialed requests to roliascan.com,
+// so it delegates here via tabs.sendMessage. Return a Promise so Firefox
+// forwards the resolved value as the response automatically.
+
+api.runtime.onMessage.addListener((msg) => {
   if (msg.action === 'GET_ROLIA_STATUS') {
-    fetch(
+    return fetch(
       `https://roliascan.com/auth/manga-status?manga_id=${msg.data.mangaId}`,
-      { credentials: 'include' }
-    )
-      .then(r => r.ok ? r.json() : null)
-      .then(data => sendResponse({ status: data?.status ?? null }))
-      .catch(() => sendResponse({ status: null }));
-    return true; // async
+      { method: 'GET', credentials: 'include' }
+    ).then(r => r.json()).catch(() => ({ status: null }));
   }
 
   if (msg.action === 'SET_ROLIA_STATUS') {
-    fetch('https://roliascan.com/auth/manga-status', {
+    return fetch('https://roliascan.com/auth/manga-status', {
       method:      'POST',
       credentials: 'include',
       headers:     { 'Content-Type': 'application/json' },
       body:        JSON.stringify({ manga_id: msg.data.mangaId, status: msg.data.status }),
-    })
-      .then(r => sendResponse({ ok: r.ok }))
-      .catch(() => sendResponse({ ok: false }));
-    return true; // async
+    }).then(r => r.json()).catch(() => ({ ok: false }));
   }
 });
 
@@ -78,13 +77,56 @@ function parseCurrentUrl() {
   };
 }
 
+/**
+ * Try to extract the total chapter count from the reader page DOM.
+ * Returns a positive integer or null if not found.
+ */
+function extractTotalRoliaChapters() {
+  // 1. Dedicated element with a chapter count
+  const countEl = document.querySelector(
+    '.chapter-count, [data-chapter-count], .total-chapters'
+  );
+  if (countEl) {
+    const n = parseInt(countEl.textContent, 10);
+    if (n > 0) return n;
+  }
+
+  // 2. Last option in a chapter select (most manga readers have one)
+  const select = document.querySelector(
+    'select[id*="chapter"], select[name*="chapter"], select[class*="chapter"]'
+  );
+  if (select && select.options.length > 0) {
+    const lastOpt = select.options[select.options.length - 1];
+    const n = parseFloat(lastOpt.value || lastOpt.textContent);
+    if (n > 0) return n;
+  }
+
+  // 3. "X / Y" navigation label (e.g. "Chapter 12 / 167")
+  const bodyText = document.body?.innerText ?? '';
+  const slashMatch = bodyText.match(/\b(\d+)\s*\/\s*(\d+)\b/);
+  if (slashMatch) {
+    const n = parseInt(slashMatch[2], 10);
+    if (n > 0) return n;
+  }
+
+  // 4. "167 chapters" text anywhere on the page
+  const chMatch = bodyText.match(/\b(\d+)\s+chapters?\b/i);
+  if (chMatch) {
+    const n = parseInt(chMatch[1], 10);
+    if (n > 0) return n;
+  }
+
+  return null;
+}
+
 function sendSync(parsed) {
   api.runtime.sendMessage(
     {
-      type:    'SYNC_CHAPTER',
-      slug:    parsed.slug,
-      chapter: parsed.chapter,
-      url:     parsed.url,
+      type:               'SYNC_CHAPTER',
+      slug:               parsed.slug,
+      chapter:            parsed.chapter,
+      url:                parsed.url,
+      totalRoliaChapters: extractTotalRoliaChapters(),
     },
     (response) => {
       if (api.runtime.lastError || !response?.ok) { /* ignore — background handles retry */ }

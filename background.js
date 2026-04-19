@@ -505,7 +505,7 @@ api.notifications.onClicked.addListener((notificationId) => {
 
 // ─── Sync logic ───────────────────────────────────────────────────────────────
 
-async function syncChapter(slug, chapter, tabId = null) {
+async function syncChapter(slug, chapter, tabId = null, totalRoliaChapters = null) {
   // Respect per-manga sync toggle
   const { slugMappings: _sm = {} } = await syncGet('slugMappings');
   if (_sm[slug]?.syncEnabled === false) return;
@@ -571,8 +571,15 @@ async function syncChapter(slug, chapter, tabId = null) {
     let newStatus    = null;
     let autoTrigger  = null;
 
-    const isFirstRead   = currentChapter === 0;
-    const isLastChapter = info.numChapters > 0 && chapterNum >= info.numChapters;
+    const isFirstRead = currentChapter === 0;
+
+    // isLastChapter: use the lower of MAL total and Rolia total so that
+    // specials/extras on MAL (e.g. MAL=170, Rolia=167) don't delay On Hold/Completed.
+    const malTotal   = info.numChapters > 0 ? info.numChapters : null;
+    const roliaTotal = totalRoliaChapters > 0 ? totalRoliaChapters : null;
+    const minTotal   = (malTotal && roliaTotal) ? Math.min(malTotal, roliaTotal)
+                     : (malTotal ?? roliaTotal ?? null);
+    const isLastChapter = minTotal !== null && chapterNum >= minTotal;
     const malFinished   = info.malStatus === 'finished';
     const mangaFinished = mapping.isFinished ?? malFinished;
     const mangaOngoing  = mapping.isOngoing  ?? !malFinished;
@@ -680,7 +687,7 @@ api.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
   switch (action) {
 
     case 'SYNC_CHAPTER':
-      syncChapter(msg.slug, msg.chapter, _sender.tab?.id ?? null)
+      syncChapter(msg.slug, msg.chapter, _sender.tab?.id ?? null, msg.totalRoliaChapters ?? null)
         .then(() => sendResponse({ ok: true }))
         .catch(err => sendResponse({ ok: false, error: err.message }));
       return true;
