@@ -392,7 +392,15 @@ async function getMalId(slug) {
 
 async function saveSlugMapping(slug, malId, malTitle) {
   const { slugMappings = {} } = await syncGet('slugMappings');
-  slugMappings[slug] = { id: malId, title: malTitle };
+  const { mangaMeta = {} }    = await api.storage.local.get('mangaMeta');
+  const existing = slugMappings[slug] ?? {};
+  const meta     = mangaMeta[slug]    ?? {};
+  slugMappings[slug] = {
+    ...existing,
+    ...meta,
+    id:    malId,
+    title: malTitle,
+  };
   await syncSet({ slugMappings });
 }
 
@@ -410,12 +418,46 @@ async function getNotificationSettings() {
 async function getAutoStatusSettings() {
   const { auto_status_settings } = await syncGet('auto_status_settings');
   return {
-    syncStatus:   auto_status_settings?.syncStatus   ?? true,
-    setReading:   auto_status_settings?.setReading   ?? true,
-    setCompleted: auto_status_settings?.setCompleted ?? true,
-    setOnHold:    auto_status_settings?.setOnHold    ?? true,
-    neverChange:  auto_status_settings?.neverChange  ?? false,
+    syncStatus:         auto_status_settings?.syncStatus         ?? true,
+    setReading:         auto_status_settings?.setReading         ?? true,
+    setCompleted:       auto_status_settings?.setCompleted       ?? true,
+    setOnHold:          auto_status_settings?.setOnHold          ?? true,
+    neverChange:        auto_status_settings?.neverChange        ?? false,
+    autoStatusReading:  auto_status_settings?.autoStatusReading  ?? true,
+    autoStatusOnHold:   auto_status_settings?.autoStatusOnHold   ?? true,
+    autoStatusComplete: auto_status_settings?.autoStatusComplete ?? true,
+    syncStatusToRolia:  auto_status_settings?.syncStatusToRolia  ?? true,
   };
+}
+
+// ─── Rolia status API ─────────────────────────────────────────────────────────
+
+async function getRoliaStatus(roliaId) {
+  try {
+    const res = await fetch(
+      `https://roliascan.com/auth/manga-status?manga_id=${roliaId}`,
+      { credentials: 'include' }
+    );
+    if (!res.ok) return null;
+    const data = await res.json();
+    return data.status ?? null;
+  } catch {
+    return null;
+  }
+}
+
+async function setRoliaStatus(roliaId, status) {
+  try {
+    const res = await fetch('https://roliascan.com/auth/manga-status', {
+      method:      'POST',
+      credentials: 'include',
+      headers:     { 'Content-Type': 'application/json' },
+      body:        JSON.stringify({ manga_id: roliaId, status }),
+    });
+    return res.ok;
+  } catch {
+    return false;
+  }
 }
 
 async function getGeneralSettings() {
@@ -473,6 +515,7 @@ async function syncChapter(slug, chapter, tabId = null) {
   // Respect per-manga sync toggle
   const { slugMappings: _sm = {} } = await syncGet('slugMappings');
   if (_sm[slug]?.syncEnabled === false) return;
+  const mapping = _sm[slug] ?? {};
 
   const chapterNum = Number(chapter);
 
@@ -531,21 +574,46 @@ async function syncChapter(slug, chapter, tabId = null) {
 
     // Determine auto status
     const autoSettings = await getAutoStatusSettings();
-    let newStatus = null;
+    let newStatus    = null;
+    let autoTrigger  = null;
+
+    const isFirstRead   = currentChapter === 0;
+    const isLastChapter = info.numChapters > 0 && chapterNum >= info.numChapters;
+    const malFinished   = info.malStatus === 'finished';
+    const mangaFinished = mapping.isFinished ?? malFinished;
+    const mangaOngoing  = mapping.isOngoing  ?? !malFinished;
+    const roliaId       = mapping.roliaId    ?? null;
 
     if (!autoSettings.neverChange) {
-      const isFirstRead  = currentChapter === 0;
-      const isLastChapter = info.numChapters > 0 && chapterNum >= info.numChapters;
-      const isFinished   = info.malStatus === 'finished';
+      const { autoStatusLocks = [] } = await api.storage.local.get('autoStatusLocks');
+      const locked = autoStatusLocks.includes(slug);
 
-      if (isFirstRead && autoSettings.setReading) {
-        newStatus = 'reading';
+      if (!locked) {
+        if (isFirstRead && autoSettings.autoStatusReading) {
+          const roliaStatus = roliaId ? await getRoliaStatus(roliaId) : null;
+          if (info.listStatus === null && (roliaStatus === null || roliaStatus === 'plan_to_read')) {
+            newStatus   = 'reading';
+            autoTrigger = 'first-chapter';
+          }
+        }
+
+        if (isLastChapter && !autoTrigger) {
+          if (mangaFinished && autoSettings.autoStatusComplete) {
+            newStatus   = 'completed';
+            autoTrigger = 'last-chapter';
+          } else if (mangaOngoing && autoSettings.autoStatusOnHold) {
+            newStatus   = 'on_hold';
+            autoTrigger = 'last-chapter';
+          }
+        }
       }
-      if (isLastChapter) {
-        if (isFinished && autoSettings.setCompleted) {
-          newStatus = 'completed';
-        } else if (!isFinished && autoSettings.setOnHold) {
-          newStatus = 'on_hold';
+
+      // Fallback to legacy settings if new ones didn't fire
+      if (!autoTrigger) {
+        if (isFirstRead && autoSettings.setReading)   newStatus = 'reading';
+        if (isLastChapter) {
+          if (malFinished && autoSettings.setCompleted)  newStatus = 'completed';
+          else if (!malFinished && autoSettings.setOnHold) newStatus = 'on_hold';
         }
       }
     }
@@ -559,6 +627,22 @@ async function syncChapter(slug, chapter, tabId = null) {
     historyEntry.status = 'success';
     await api.storage.local.set({ last_sync: { slug, chapter: String(chapter) } });
     await showNotification('success', `${malTitle} — Chapter ${chapter} saved to MAL`, tabId);
+
+    // Sync status back to Rolia + record auto-status history entry
+    if (autoTrigger && newStatus) {
+      if (roliaId && autoSettings.syncStatusToRolia) {
+        await setRoliaStatus(roliaId, newStatus);
+      }
+      await addHistoryEntry({
+        type:      'auto-status',
+        manga:     slug,
+        malTitle,
+        status:    newStatus,
+        trigger:   autoTrigger,
+        timestamp: Date.now(),
+      });
+    }
+
     return 'synced';
   };
 
@@ -781,13 +865,44 @@ api.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
       (async () => {
         try {
           const settings = {
-            syncStatus:   msg.settings?.syncStatus   ?? true,
-            setReading:   msg.settings?.setReading   ?? true,
-            setCompleted: msg.settings?.setCompleted ?? true,
-            setOnHold:    msg.settings?.setOnHold    ?? true,
-            neverChange:  msg.settings?.neverChange  ?? false,
+            syncStatus:         msg.settings?.syncStatus         ?? true,
+            setReading:         msg.settings?.setReading         ?? true,
+            setCompleted:       msg.settings?.setCompleted       ?? true,
+            setOnHold:          msg.settings?.setOnHold          ?? true,
+            neverChange:        msg.settings?.neverChange        ?? false,
+            autoStatusReading:  msg.settings?.autoStatusReading  ?? true,
+            autoStatusOnHold:   msg.settings?.autoStatusOnHold   ?? true,
+            autoStatusComplete: msg.settings?.autoStatusComplete ?? true,
+            syncStatusToRolia:  msg.settings?.syncStatusToRolia  ?? true,
           };
           await syncSet({ auto_status_settings: settings });
+          sendResponse({ ok: true });
+        } catch (err) {
+          sendResponse({ ok: false, error: err.message });
+        }
+      })();
+      return true;
+
+    case 'SAVE_MANGA_META':
+      (async () => {
+        try {
+          const { slugMappings = {} } = await syncGet('slugMappings');
+          if (slugMappings[msg.slug]) {
+            // Mapping exists — enrich it directly
+            if (msg.roliaId   != null) slugMappings[msg.slug].roliaId   = msg.roliaId;
+            if (msg.isOngoing != null) slugMappings[msg.slug].isOngoing = msg.isOngoing;
+            if (msg.isFinished!= null) slugMappings[msg.slug].isFinished= msg.isFinished;
+            await syncSet({ slugMappings });
+          } else {
+            // No MAL mapping yet — cache for later merge in saveSlugMapping
+            const { mangaMeta = {} } = await api.storage.local.get('mangaMeta');
+            mangaMeta[msg.slug] = {
+              roliaId:    msg.roliaId,
+              isOngoing:  msg.isOngoing,
+              isFinished: msg.isFinished,
+            };
+            await api.storage.local.set({ mangaMeta });
+          }
           sendResponse({ ok: true });
         } catch (err) {
           sendResponse({ ok: false, error: err.message });
@@ -1022,6 +1137,13 @@ api.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
             newStatus: mappedStatus,
             timestamp: Date.now(),
           });
+
+          // Lock auto-status for this slug — user explicitly set a status
+          const { autoStatusLocks = [] } = await api.storage.local.get('autoStatusLocks');
+          if (!autoStatusLocks.includes(slug)) {
+            autoStatusLocks.push(slug);
+            await api.storage.local.set({ autoStatusLocks });
+          }
 
           sendResponse({ ok: true });
         } catch (err) {

@@ -234,6 +234,27 @@ async function initBookmarksPage() {
   scanObserver.observe(root, { childList: true, subtree: true });
 }
 
+// ─── Manga meta extraction (roliascan.com/manga/{slug}/) ─────────────────────
+
+function extractAndSendMangaMeta() {
+  const slugMatch = window.location.pathname.match(/\/manga\/([\w-]+)\/?/);
+  const slug = slugMatch ? slugMatch[1] : null;
+  if (!slug) return;
+
+  const roliaId   = document.body.dataset.mangaId ?? null;
+  const bodyText  = document.body.innerText;
+  const isOngoing  = /Ongoing/i.test(bodyText);
+  const isFinished = /Finished|Completed/i.test(bodyText) && !isOngoing;
+
+  api.runtime.sendMessage({
+    type: 'SAVE_MANGA_META',
+    slug,
+    roliaId:    roliaId ? Number(roliaId) : null,
+    isOngoing,
+    isFinished,
+  });
+}
+
 // ─── URL routing ──────────────────────────────────────────────────────────────
 
 const _href = window.location.href;
@@ -241,6 +262,7 @@ const _href = window.location.href;
 const isMangaPage = /roliascan\.com\/manga\/[\w-]+\/?$/.test(_href);
 if (isMangaPage) {
   setupFetchInterceptor();
+  extractAndSendMangaMeta();
 }
 
 if (/roliascan\.com\/read\//.test(_href)) {

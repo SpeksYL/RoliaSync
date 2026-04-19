@@ -29,13 +29,17 @@ const btnSaveNotif     = document.getElementById('btn-save-notif');
 const notifMsg         = document.getElementById('notif-msg');
 
 // ─── DOM refs — Auto Status ───────────────────────────────────────────────────
-const syncStatusEl     = document.getElementById('sync-status');
-const autoSetReading   = document.getElementById('auto-set-reading');
-const autoSetCompleted = document.getElementById('auto-set-completed');
-const autoSetOnHold    = document.getElementById('auto-set-on-hold');
-const autoNeverChange  = document.getElementById('auto-never-change');
-const btnSaveAuto      = document.getElementById('btn-save-auto');
-const autoStatusMsg    = document.getElementById('auto-status-msg');
+const syncStatusEl        = document.getElementById('sync-status');
+const autoSetReading      = document.getElementById('auto-set-reading');
+const autoSetCompleted    = document.getElementById('auto-set-completed');
+const autoSetOnHold       = document.getElementById('auto-set-on-hold');
+const autoNeverChange     = document.getElementById('auto-never-change');
+const autoStatusReadingEl = document.getElementById('auto-status-reading');
+const autoStatusOnHoldEl  = document.getElementById('auto-status-on-hold');
+const autoStatusCompleteEl= document.getElementById('auto-status-complete');
+const syncStatusToRoliaEl = document.getElementById('sync-status-to-rolia');
+const btnSaveAuto         = document.getElementById('btn-save-auto');
+const autoStatusMsg       = document.getElementById('auto-status-msg');
 
 // ─── DOM refs — Import ────────────────────────────────────────────────────────
 const importEmpty       = document.getElementById('import-empty');
@@ -178,11 +182,15 @@ async function initGeneralTab() {
 
     const autoRes = await sendMsg('GET_AUTO_STATUS_SETTINGS');
     if (autoRes.ok && autoRes.settings) {
-      if (syncStatusEl)     syncStatusEl.checked     = autoRes.settings.syncStatus   ?? true;
-      if (autoSetReading)   autoSetReading.checked   = autoRes.settings.setReading   ?? true;
-      if (autoSetCompleted) autoSetCompleted.checked = autoRes.settings.setCompleted ?? true;
-      if (autoSetOnHold)    autoSetOnHold.checked    = autoRes.settings.setOnHold    ?? true;
-      if (autoNeverChange)  autoNeverChange.checked  = autoRes.settings.neverChange  ?? false;
+      if (syncStatusEl)          syncStatusEl.checked          = autoRes.settings.syncStatus         ?? true;
+      if (autoSetReading)        autoSetReading.checked        = autoRes.settings.setReading         ?? true;
+      if (autoSetCompleted)      autoSetCompleted.checked      = autoRes.settings.setCompleted       ?? true;
+      if (autoSetOnHold)         autoSetOnHold.checked         = autoRes.settings.setOnHold          ?? true;
+      if (autoNeverChange)       autoNeverChange.checked       = autoRes.settings.neverChange        ?? false;
+      if (autoStatusReadingEl)   autoStatusReadingEl.checked   = autoRes.settings.autoStatusReading  ?? true;
+      if (autoStatusOnHoldEl)    autoStatusOnHoldEl.checked    = autoRes.settings.autoStatusOnHold   ?? true;
+      if (autoStatusCompleteEl)  autoStatusCompleteEl.checked  = autoRes.settings.autoStatusComplete ?? true;
+      if (syncStatusToRoliaEl)   syncStatusToRoliaEl.checked   = autoRes.settings.syncStatusToRolia  ?? true;
     }
 
     const genRes = await sendMsg('GET_GENERAL_SETTINGS');
@@ -274,11 +282,15 @@ if (btnSaveNotif) {
 if (btnSaveAuto) {
   btnSaveAuto.addEventListener('click', async () => {
     const settings = {
-      syncStatus:   syncStatusEl?.checked      ?? true,
-      setReading:   autoSetReading?.checked    ?? true,
-      setCompleted: autoSetCompleted?.checked  ?? true,
-      setOnHold:    autoSetOnHold?.checked     ?? true,
-      neverChange:  autoNeverChange?.checked   ?? false,
+      syncStatus:         syncStatusEl?.checked         ?? true,
+      setReading:         autoSetReading?.checked       ?? true,
+      setCompleted:       autoSetCompleted?.checked     ?? true,
+      setOnHold:          autoSetOnHold?.checked        ?? true,
+      neverChange:        autoNeverChange?.checked      ?? false,
+      autoStatusReading:  autoStatusReadingEl?.checked  ?? true,
+      autoStatusOnHold:   autoStatusOnHoldEl?.checked   ?? true,
+      autoStatusComplete: autoStatusCompleteEl?.checked ?? true,
+      syncStatusToRolia:  syncStatusToRoliaEl?.checked  ?? true,
     };
 
     btnSaveAuto.disabled    = true;

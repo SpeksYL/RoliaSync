@@ -889,6 +889,38 @@
         <input type="checkbox" id="auto-never-change" />
       </div>
 
+      <div class="toggle-row">
+        <div>
+          <div class="toggle-label">Auto set Reading on first chapter</div>
+          <div class="toggle-hint">Sets "Reading" when you open chapter 1 and have no status yet on MAL or Rolia</div>
+        </div>
+        <input type="checkbox" id="auto-status-reading" checked />
+      </div>
+
+      <div class="toggle-row">
+        <div>
+          <div class="toggle-label">Auto set On Hold on last chapter (Ongoing)</div>
+          <div class="toggle-hint">Sets "On Hold" when you reach the latest chapter of an ongoing manga</div>
+        </div>
+        <input type="checkbox" id="auto-status-on-hold" checked />
+      </div>
+
+      <div class="toggle-row">
+        <div>
+          <div class="toggle-label">Auto set Completed on last chapter (Finished)</div>
+          <div class="toggle-hint">Sets "Completed" when you finish a manga marked as finished</div>
+        </div>
+        <input type="checkbox" id="auto-status-complete" checked />
+      </div>
+
+      <div class="toggle-row">
+        <div>
+          <div class="toggle-label">Also sync auto status back to Rolia</div>
+          <div class="toggle-hint">When auto-setting a status, also POST it to roliascan.com</div>
+        </div>
+        <input type="checkbox" id="sync-status-to-rolia" checked />
+      </div>
+
       <div class="btn-row">
         <button class="btn btn-primary" id="btn-save-auto">Save</button>
       </div>
