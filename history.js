@@ -48,7 +48,7 @@ function buildStatusCell(entry, td) {
 
   if (entry.status === 'success') {
     badge.classList.add('status-success');
-    badge.textContent = '✅ Success';
+    badge.textContent = entry.dateSet ? `✅ Success — ${entry.dateSet}` : '✅ Success';
   } else if (entry.status === 'error') {
     badge.classList.add('status-error');
     badge.textContent = '⚠️ Error';

@@ -331,11 +331,14 @@ async function searchMangaAuth(slug) {
   return { id: data.data[0].node.id, title: data.data[0].node.title };
 }
 
-// Update chapter progress, and optionally set reading status.
+// Update chapter progress, and optionally set reading status + date fields.
 // status = null means don't change the status field (MAL keeps existing).
-async function updateMangaProgress(malId, chapterNum, status = null) {
+async function updateMangaProgress(malId, chapterNum, status = null, currentInfo = null) {
   const body = { num_chapters_read: chapterNum };
-  if (status) body.status = status;
+  if (status) {
+    const statusBody = buildStatusPatchBody(status, currentInfo);
+    Object.assign(body, statusBody);
+  }
 
   const res = await malRequest('PATCH', `/manga/${malId}/my_list_status`, body);
 
@@ -359,17 +362,28 @@ async function getMALUsername() {
 async function getMalMangaInfo(malId) {
   const token = await getValidToken();
   const res   = await fetch(
-    `${MAL_API_BASE}/manga/${malId}?fields=num_chapters,my_list_status,status`,
+    `${MAL_API_BASE}/manga/${malId}?fields=num_chapters,my_list_status{status,num_chapters_read,start_date,finish_date},status`,
     { headers: { Authorization: `Bearer ${token}` } }
   );
   if (!res.ok) throw new Error(`MAL info query failed: ${res.status}`);
   const data = await res.json();
   return {
-    numChapters:  data.num_chapters ?? 0,           // 0 = unknown / ongoing
-    malStatus:    data.status ?? '',                 // "finished" | "currently_publishing" | …
-    listStatus:   data.my_list_status?.status ?? null, // user's current reading status
+    numChapters:  data.num_chapters ?? 0,
+    malStatus:    data.status ?? '',
+    listStatus:   data.my_list_status?.status         ?? null,
     chaptersRead: data.my_list_status?.num_chapters_read ?? 0,
+    startDate:    data.my_list_status?.start_date      ?? null,
+    finishDate:   data.my_list_status?.finish_date     ?? null,
   };
+}
+
+// Build PATCH body for a status change, adding start/finish date only when not yet set.
+function buildStatusPatchBody(status, currentInfo = null) {
+  const body = { status };
+  const today = new Date().toISOString().split('T')[0];
+  if (status === 'reading'   && !currentInfo?.startDate)  body.start_date  = today;
+  if (status === 'completed' && !currentInfo?.finishDate) body.finish_date = today;
+  return body;
 }
 
 // ─── Slug mapping ─────────────────────────────────────────────────────────────
@@ -429,12 +443,23 @@ async function getAutoStatusSettings() {
   };
 }
 
+// ─── tabs.sendMessage with timeout ───────────────────────────────────────────
+
+async function sendMessageToTab(tabId, message, timeout = 5000) {
+  return new Promise((resolve) => {
+    const timer = setTimeout(() => resolve(null), timeout);
+    api.tabs.sendMessage(tabId, message)
+      .then(response => { clearTimeout(timer); resolve(response); })
+      .catch(() => { clearTimeout(timer); resolve(null); });
+  });
+}
+
 // ─── Manga meta — live fetch + cache write ────────────────────────────────────
 
 async function getMangaMetaLive(slug, tabId) {
   if (!tabId) return null;
   try {
-    const res = await api.tabs.sendMessage(tabId, { action: 'GET_MANGA_META', slug });
+    const res = await sendMessageToTab(tabId, { action: 'GET_MANGA_META', slug });
     if (!res) return null;
     return {
       roliaId:       res.roliaId ? Number(res.roliaId) : null,
@@ -471,15 +496,11 @@ async function saveMangaMetaToCache(slug, meta) {
 
 async function getRoliaStatus(roliaId, tabId) {
   if (!tabId) return null;
-  try {
-    const res = await api.tabs.sendMessage(tabId, {
-      action: 'GET_ROLIA_STATUS',
-      data:   { mangaId: roliaId },
-    });
-    return res?.status ?? null;
-  } catch {
-    return null;
-  }
+  const res = await sendMessageToTab(tabId, {
+    action: 'GET_ROLIA_STATUS',
+    data:   { mangaId: roliaId },
+  });
+  return res?.status ?? null;
 }
 
 // Slugs with an in-flight auto-status POST — prevents ROLIA_STATUS_CHANGED
@@ -492,13 +513,11 @@ async function setRoliaStatus(roliaId, status, tabId, slug = null) {
     _autoStatusInProgress.add(slug);
     setTimeout(() => _autoStatusInProgress.delete(slug), 5000);
   }
-  try {
-    await api.tabs.sendMessage(tabId, {
-      action:       'SET_ROLIA_STATUS',
-      isAutoStatus: true,
-      data:         { mangaId: roliaId, status },
-    });
-  } catch { /* ignore */ }
+  await sendMessageToTab(tabId, {
+    action:       'SET_ROLIA_STATUS',
+    isAutoStatus: true,
+    data:         { mangaId: roliaId, status },
+  });
 }
 
 async function getGeneralSettings() {
@@ -517,11 +536,11 @@ async function showNotification(type, message, tabId = null) {
 
   // Toast is the primary notification — always show when we have a tab
   if (settings.inPageToast && tabId != null) {
-    api.tabs.sendMessage(tabId, {
+    sendMessageToTab(tabId, {
       action:  'SHOW_TOAST',
       message,
       type:    type === 'success' ? 'success' : 'error',
-    }).catch(() => {});
+    });
   }
 
   // Browser notification is additional/optional
@@ -700,8 +719,14 @@ async function syncChapter(slug, chapter, tabId = null, totalRoliaChapters = nul
       newStatus = 'reading';
     }
 
-    await updateMangaProgress(malId, chapterNum, newStatus);
+    await updateMangaProgress(malId, chapterNum, newStatus, info);
     historyEntry.status = 'success';
+
+    // Record which date was set so history.js can show it
+    const today = new Date().toISOString().split('T')[0];
+    if (newStatus === 'reading'   && !info.startDate)  historyEntry.dateSet = today;
+    if (newStatus === 'completed' && !info.finishDate) historyEntry.dateSet = today;
+
     await api.storage.local.set({ last_sync: { slug, chapter: String(chapter) } });
     await showNotification('success', `${malTitle} — Chapter ${chapter} saved to MAL`, tabId);
 
@@ -1125,7 +1150,7 @@ api.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
           const res = await malRequest(
             'PATCH',
             `/manga/${malId}/my_list_status`,
-            { status: msg.status }
+            buildStatusPatchBody(msg.status, info)
           );
           if (!res.ok) throw new Error(`Status sync failed: ${res.status}`);
 
@@ -1200,7 +1225,7 @@ api.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
           const res = await malRequest(
             'PATCH',
             `/manga/${malId}/my_list_status`,
-            { status: mappedStatus }
+            buildStatusPatchBody(mappedStatus, info)
           );
           if (!res.ok) throw new Error(`MAL status update failed: ${res.status}`);
 
