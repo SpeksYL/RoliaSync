@@ -640,19 +640,24 @@ async function syncChapter(slug, chapter, tabId = null, totalRoliaChapters = nul
     const mangaOngoing  = effectiveMeta.isOngoing  ?? !malFinished;
     const roliaId       = effectiveMeta.roliaId    ?? null;
 
-    // isLastChapter: use the lower of MAL total and Rolia total so that
-    // specials/extras on MAL (e.g. MAL=170, Rolia=167) don't delay On Hold/Completed.
     const malTotal   = info.numChapters > 0 ? info.numChapters : null;
     const roliaTotal = (liveMeta?.totalChapters > 0 ? liveMeta.totalChapters : null)
                     ?? (totalRoliaChapters > 0 ? totalRoliaChapters : null);
-    const minTotal   = (malTotal && roliaTotal) ? Math.min(malTotal, roliaTotal)
-                     : (malTotal ?? roliaTotal ?? null);
-    const isLastChapter = minTotal !== null && chapterNum >= minTotal;
+
+    // For finished manga Rolia is authoritative — trigger on either total.
+    // For ongoing manga use the minimum so MAL specials don't delay On Hold.
+    let isLastChapter;
+    if (effectiveMeta?.isFinished) {
+      isLastChapter = (roliaTotal > 0 && chapterNum >= roliaTotal) ||
+                      (malTotal   > 0 && chapterNum >= malTotal);
+    } else {
+      const minTotal = Math.min(roliaTotal || Infinity, malTotal || Infinity);
+      isLastChapter  = minTotal > 0 && minTotal < Infinity && chapterNum >= minTotal;
+    }
 
     console.error('[RoliaSync] doSync meta:', effectiveMeta,
       'isLastChapter:', isLastChapter,
       'chapterNum:', chapterNum,
-      'minTotal:', minTotal,
       'malTotal:', malTotal,
       'roliaTotal:', roliaTotal,
       'isFirstRead:', isFirstRead,
