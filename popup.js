@@ -7,6 +7,15 @@
 
 const api = typeof browser !== 'undefined' ? browser : chrome;
 
+// ─── Platform layout ─────────────────────────────────────────────────────────
+// On desktop the popup has a fixed size; on Android it fills the tab viewport.
+api.runtime.getPlatformInfo().then(info => {
+  if (info.os !== 'android') {
+    document.body.style.width     = '380px';
+    document.body.style.minHeight = '500px';
+  }
+}).catch(() => {});
+
 // ─── DOM refs ─────────────────────────────────────────────────────────────────
 const loading          = document.getElementById('loading');
 const viewLoggedout    = document.getElementById('view-loggedout');

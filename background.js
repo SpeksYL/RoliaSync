@@ -441,6 +441,17 @@ async function getAutoStatusSettings() {
   };
 }
 
+// ─── Active tab helper ────────────────────────────────────────────────────────
+
+async function getActiveTabId() {
+  try {
+    const tabs = await api.tabs.query({ active: true, currentWindow: true });
+    return tabs[0]?.id ?? null;
+  } catch {
+    return null;
+  }
+}
+
 // ─── tabs.sendMessage with timeout ───────────────────────────────────────────
 
 async function sendMessageToTab(tabId, message, timeout = 5000) {
@@ -1139,6 +1150,7 @@ api.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
             return;
           }
 
+          const tabId = _sender.tab?.id ?? await getActiveTabId();
           const { data } = msg;
 
           // Try multiple field names Rolia might use
@@ -1206,6 +1218,9 @@ api.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
             }
           }
 
+          await showNotification('success',
+            `🔄 ${malTitle} — ${oldStatus ?? '?'} → ${mappedStatus}`, tabId);
+
           sendResponse({ ok: true });
         } catch (err) {
           sendResponse({ ok: false, error: err.message });
@@ -1234,17 +1249,13 @@ api.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
   }
 });
 
-// ─── Browser action — open popup or tab depending on platform ─────────────────
+// ─── Browser action — Android: open popup as tab (desktop uses default_popup) ──
 
 api.browserAction.onClicked.addListener(async () => {
+  // This fires only on Android (default_popup suppresses onClicked on desktop)
   const info = await api.runtime.getPlatformInfo();
   if (info.os === 'android') {
     api.tabs.create({ url: api.runtime.getURL('popup.html') });
-  } else {
-    api.browserAction.openPopup().catch(() => {
-      // Fallback: open as tab if openPopup() is unavailable
-      api.tabs.create({ url: api.runtime.getURL('popup.html') });
-    });
   }
 });
 
