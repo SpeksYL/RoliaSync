@@ -598,9 +598,13 @@ async function syncChapter(slug, chapter, tabId = null, totalRoliaChapters = nul
     const info = await getMalMangaInfo(malId);
     const currentChapter = info.chaptersRead;
 
-    if (chapterNum === currentChapter) return 'skip';
+    if (chapterNum === currentChapter) {
+      console.error('[RoliaSync] Skipped reason: already at this chapter', 'slug:', slug, 'chapter:', chapterNum);
+      return 'skip';
+    }
 
     if (chapterNum < currentChapter) {
+      console.error('[RoliaSync] Skipped reason: chapter behind MAL progress', 'slug:', slug, 'chapter:', chapterNum, 'malProgress:', currentChapter);
       try {
         api.notifications.create(`skipped_${slug}`, {
           type:    'basic',

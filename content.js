@@ -54,12 +54,22 @@ api.runtime.onMessage.addListener((msg) => {
   }
 
   if (msg.action === 'SET_ROLIA_STATUS') {
+    console.error('[RoliaSync] SET_ROLIA_STATUS received:', msg.data);
     return fetch('https://roliascan.com/auth/manga-status', {
       method:      'POST',
       credentials: 'include',
       headers:     { 'Content-Type': 'application/json' },
       body:        JSON.stringify({ manga_id: msg.data.mangaId, status: msg.data.status }),
-    }).then(r => r.json()).catch(() => ({ ok: false }));
+    })
+      .then(r => r.json())
+      .then(data => {
+        console.error('[RoliaSync] SET_ROLIA_STATUS result:', data);
+        return data;
+      })
+      .catch(e => {
+        console.error('[RoliaSync] SET_ROLIA_STATUS error:', e.message);
+        return { error: e.message };
+      });
   }
 
   if (msg.action === 'GET_MANGA_META') {
@@ -157,6 +167,14 @@ function extractTotalRoliaChapters() {
 }
 
 function sendSync(parsed) {
+  const chapterNum = parseFloat(parsed.chapter);
+  console.error('[RoliaSync] URL:', parsed.url, 'chapter:', chapterNum);
+
+  if (!chapterNum || chapterNum <= 0) {
+    console.error('[RoliaSync] Skipped: chapter parsed as 0 or invalid from URL');
+    return;
+  }
+
   api.runtime.sendMessage(
     {
       type:               'SYNC_CHAPTER',
