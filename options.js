@@ -49,6 +49,22 @@ const importProgressLabel = document.getElementById('import-progress-label');
 const importProgressFill  = document.getElementById('import-progress-fill');
 const importResultSummary = document.getElementById('import-result-summary');
 
+// ─── DOM refs — CSV Import ────────────────────────────────────────────────────
+const csvFileInput      = document.getElementById('csv-file-input');
+const csvFileName       = document.getElementById('csv-file-name');
+const csvApplyMal       = document.getElementById('csv-apply-mal');
+const csvApplyRolia     = document.getElementById('csv-apply-rolia');
+const csvPreviewWrap    = document.getElementById('csv-preview-wrap');
+const csvFormatInfo     = document.getElementById('csv-format-info');
+const csvPreviewBody    = document.getElementById('csv-preview-body');
+const csvMoreRows       = document.getElementById('csv-more-rows');
+const btnCsvImport      = document.getElementById('btn-csv-import');
+const btnCsvCancel      = document.getElementById('btn-csv-cancel');
+const csvProgressWrap   = document.getElementById('csv-progress-wrap');
+const csvProgressLabel  = document.getElementById('csv-progress-label');
+const csvProgressFill   = document.getElementById('csv-progress-fill');
+const csvResult         = document.getElementById('csv-result');
+
 // ─── DOM refs — Mappings ──────────────────────────────────────────────────────
 const mappingsPendingNotice = document.getElementById('mappings-pending-notice');
 const pendingSlugDisplay    = document.getElementById('pending-slug-display');
@@ -766,6 +782,248 @@ btnImportClear?.addEventListener('click', async () => {
   importResultSummary.style.display = 'none';
   importManga = [];
   tabsInit.delete('import'); // allow re-init if user imports again
+});
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// ── CSV IMPORT ────────────────────────────────────────────────────────────────
+// ═══════════════════════════════════════════════════════════════════════════════
+
+let csvParsedEntries = [];
+
+// Parse a single CSV line, respecting quoted fields
+function parseCSVRow(line) {
+  const cells = [];
+  let cur = '', inQuotes = false;
+  for (let i = 0; i < line.length; i++) {
+    const ch = line[i];
+    if (ch === '"') {
+      if (inQuotes && line[i + 1] === '"') { cur += '"'; i++; }
+      else { inQuotes = !inQuotes; }
+    } else if (ch === ',' && !inQuotes) {
+      cells.push(cur.trim()); cur = '';
+    } else {
+      cur += ch;
+    }
+  }
+  cells.push(cur.trim());
+  return cells;
+}
+
+// Parse full CSV text → { format, headers, entries }
+function parseCSV(text) {
+  const lines = text.replace(/\r\n/g, '\n').replace(/\r/g, '\n').split('\n')
+    .map(l => l.trim()).filter(l => l.length > 0);
+
+  if (lines.length < 2) throw new Error('CSV must have a header row and at least one data row');
+
+  const headers = parseCSVRow(lines[0]).map(h => h.toLowerCase());
+
+  // Auto-detect format
+  const format = headers.includes('manga_title') ? 'mal' : 'roliasync';
+
+  // Validate required columns
+  if (format === 'roliasync') {
+    if (!headers.includes('mal_id')) throw new Error('RoliaSync CSV must have a "mal_id" column');
+  } else {
+    if (!headers.includes('mal_id')) throw new Error('MAL CSV must have a "mal_id" column');
+  }
+
+  const MAL_STATUS_MAP = {
+    'reading': 'reading', 'completed': 'completed',
+    'on-hold': 'on_hold', 'on hold': 'on_hold',
+    'dropped': 'dropped', 'plan to read': 'plan_to_read',
+    'plantoread': 'plan_to_read',
+  };
+
+  const entries = [];
+  for (let i = 1; i < lines.length; i++) {
+    const cells = parseCSVRow(lines[i]);
+    const get   = col => cells[headers.indexOf(col)]?.trim() ?? '';
+
+    let entry;
+    if (format === 'roliasync') {
+      entry = {
+        slug:         get('slug') || null,
+        malId:        parseInt(get('mal_id'), 10) || null,
+        malTitle:     get('mal_title') || null,
+        status:       get('status') || null,
+        chaptersRead: parseInt(get('chapters_read'), 10) || 0,
+      };
+    } else {
+      const rawStatus = get('status').toLowerCase();
+      entry = {
+        slug:         null,
+        malId:        parseInt(get('mal_id'), 10) || null,
+        malTitle:     get('manga_title') || null,
+        status:       MAL_STATUS_MAP[rawStatus] ?? null,
+        chaptersRead: parseInt(get('chapters_read'), 10) || 0,
+      };
+    }
+
+    if (entry.malId) entries.push(entry);
+  }
+
+  if (entries.length === 0) throw new Error('No valid rows found (need at least a mal_id column)');
+
+  return { format, headers, entries };
+}
+
+function renderCSVPreview(entries, format, totalRows) {
+  csvPreviewBody.textContent = '';
+
+  const PREVIEW_MAX = 5;
+  const preview = entries.slice(0, PREVIEW_MAX);
+
+  preview.forEach(entry => {
+    const tr = document.createElement('tr');
+
+    const tdTitle = document.createElement('td');
+    if (entry.malTitle) {
+      tdTitle.textContent = entry.malTitle;
+      if (entry.slug) {
+        const small = document.createElement('div');
+        small.style.cssText = 'font-size:10px; color:#546e7a; font-family:monospace; margin-top:2px;';
+        small.textContent = entry.slug;
+        tdTitle.appendChild(small);
+      }
+    } else {
+      tdTitle.className   = 'td-mono';
+      tdTitle.textContent = entry.slug ?? '–';
+    }
+
+    const tdId = document.createElement('td');
+    tdId.className   = 'td-mono';
+    tdId.textContent = entry.malId ?? '–';
+
+    const tdStatus = document.createElement('td');
+    tdStatus.textContent = entry.status ?? '–';
+    if (!entry.status) tdStatus.className = 'td-dim';
+
+    const tdCh = document.createElement('td');
+    tdCh.textContent = entry.chaptersRead > 0 ? entry.chaptersRead : '–';
+    if (!entry.chaptersRead) tdCh.className = 'td-dim';
+
+    tr.appendChild(tdTitle);
+    tr.appendChild(tdId);
+    tr.appendChild(tdStatus);
+    tr.appendChild(tdCh);
+    csvPreviewBody.appendChild(tr);
+  });
+
+  if (totalRows > PREVIEW_MAX) {
+    csvMoreRows.textContent = `…and ${totalRows - PREVIEW_MAX} more rows`;
+    csvMoreRows.style.display = '';
+  } else {
+    csvMoreRows.style.display = 'none';
+  }
+}
+
+function csvReset() {
+  csvFileInput.value      = '';
+  csvFileName.textContent = '';
+  csvParsedEntries        = [];
+  csvPreviewWrap.style.display   = 'none';
+  csvProgressWrap.style.display  = 'none';
+  csvResult.style.display        = 'none';
+}
+
+csvFileInput.addEventListener('change', async (e) => {
+  const file = e.target.files[0];
+  if (!file) return;
+
+  csvResult.style.display = 'none';
+  csvProgressWrap.style.display = 'none';
+  csvFileName.textContent = file.name;
+
+  try {
+    const text = await file.text();
+    const { format, entries } = parseCSV(text);
+    csvParsedEntries = entries;
+
+    const formatLabel = format === 'mal' ? 'MAL Export CSV' : 'RoliaSync CSV';
+    csvFormatInfo.textContent = `Detected: ${formatLabel} · ${entries.length} valid rows`;
+    renderCSVPreview(entries, format, entries.length);
+    csvPreviewWrap.style.display = '';
+  } catch (err) {
+    csvResult.className     = 'msg msg-err';
+    csvResult.textContent   = `Parse error: ${err.message}`;
+    csvResult.style.display = 'block';
+    csvPreviewWrap.style.display = 'none';
+    csvParsedEntries = [];
+  }
+});
+
+btnCsvCancel?.addEventListener('click', csvReset);
+
+btnCsvImport?.addEventListener('click', async () => {
+  if (csvParsedEntries.length === 0) return;
+
+  const applyMal   = csvApplyMal?.checked   ?? true;
+  const applyRolia = csvApplyRolia?.checked ?? false;
+
+  btnCsvImport.disabled  = true;
+  btnCsvCancel.disabled  = true;
+  csvPreviewWrap.style.display  = 'none';
+  csvProgressWrap.style.display = '';
+  csvResult.style.display       = 'none';
+
+  const total = csvParsedEntries.length;
+  csvProgressLabel.textContent = `Importing 0 / ${total}…`;
+  csvProgressFill.style.width  = '0%';
+
+  // Send to background — progress is estimated (no per-row callback)
+  // Animate progress bar while waiting
+  let fakeProgress = 0;
+  const progressInterval = setInterval(() => {
+    fakeProgress = Math.min(fakeProgress + (90 / total), 88);
+    csvProgressFill.style.width  = `${fakeProgress}%`;
+    csvProgressLabel.textContent = `Importing… (${Math.round(fakeProgress)}%)`;
+  }, 600);
+
+  try {
+    const res = await sendMsg('IMPORT_CSV', {
+      entries:    csvParsedEntries,
+      applyMal,
+      applyRolia,
+    });
+
+    clearInterval(progressInterval);
+    csvProgressFill.style.width  = '100%';
+    csvProgressLabel.textContent = 'Done!';
+
+    if (!res.ok) throw new Error(res.error ?? 'Import failed');
+
+    const { mappingsUpdated, malUpdated, roliaUpdated, errors } = res.results;
+    const parts = [];
+    if (mappingsUpdated > 0) parts.push(`${mappingsUpdated} mappings saved`);
+    if (malUpdated      > 0) parts.push(`${malUpdated} MAL entries updated`);
+    if (roliaUpdated    > 0) parts.push(`${roliaUpdated} Rolia statuses set`);
+
+    const hasErrors = errors.length > 0;
+    csvResult.className   = hasErrors ? 'msg msg-err' : 'msg msg-ok';
+    csvResult.textContent = (parts.length > 0 ? '✅ ' + parts.join(' · ') : 'Nothing to update')
+      + (hasErrors ? `\n⚠️ ${errors.length} error(s):\n${errors.slice(0, 5).join('\n')}` : '');
+    csvResult.style.display = 'block';
+
+    csvReset();
+    csvResult.style.display = 'block'; // keep result visible after reset
+    if (hasErrors) {
+      csvResult.className   = 'msg msg-err';
+      csvResult.textContent = (parts.length > 0 ? '✅ ' + parts.join(' · ') + '\n' : '')
+        + `⚠️ ${errors.length} error(s):\n${errors.slice(0, 5).join('\n')}`;
+    } else {
+      csvResult.className   = 'msg msg-ok';
+      csvResult.textContent = parts.length > 0 ? '✅ ' + parts.join(' · ') : '✅ Done (nothing to update)';
+    }
+  } catch (err) {
+    clearInterval(progressInterval);
+    csvProgressWrap.style.display = 'none';
+    csvResult.className   = 'msg msg-err';
+    csvResult.textContent = `Error: ${err.message}`;
+    csvResult.style.display = 'block';
+    btnCsvImport.disabled = false;
+    btnCsvCancel.disabled = false;
+  }
 });
 
 // ═══════════════════════════════════════════════════════════════════════════════

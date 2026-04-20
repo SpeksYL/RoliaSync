@@ -392,7 +392,6 @@ function buildStatusPatchBody(status, currentInfo = null) {
 
 async function getMalId(slug) {
   const slugMappings = (await syncGet('slugMappings')) ?? {};
-  console.error('[RoliaSync] getMalId read:', slug, '→', slugMappings[slug]);
 
   if (slugMappings[slug]) {
     const mapping = slugMappings[slug];
@@ -418,7 +417,6 @@ async function saveSlugMapping(slug, malId, malTitle) {
     id:    malId,
     title: malTitle,
   };
-  console.error('[RoliaSync] saveSlugMapping write:', slug, slugMappings[slug]);
   await syncSet('slugMappings', slugMappings);
 }
 
@@ -1248,6 +1246,70 @@ api.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
       })();
       return true;
 
+    case 'IMPORT_CSV':
+      (async () => {
+        try {
+          const { entries, applyMal, applyRolia } = msg;
+          let mappingsUpdated = 0, malUpdated = 0, roliaUpdated = 0;
+          const errors = [];
+
+          const slugMappings = (await syncGet('slugMappings')) ?? {};
+
+          for (let i = 0; i < entries.length; i++) {
+            const entry = entries[i];
+            if (i > 0) await new Promise(r => setTimeout(r, 500));
+
+            try {
+              // Update slug mapping
+              if (entry.slug && entry.malId) {
+                slugMappings[entry.slug] = {
+                  ...slugMappings[entry.slug],
+                  id:    entry.malId,
+                  title: entry.malTitle ?? slugMappings[entry.slug]?.title ?? '',
+                };
+                mappingsUpdated++;
+              }
+
+              // Update MAL
+              if (applyMal && entry.malId) {
+                const body = {};
+                if (entry.chaptersRead > 0) body.num_chapters_read = entry.chaptersRead;
+                if (entry.status) body.status = entry.status;
+                if (Object.keys(body).length > 0) {
+                  const res = await malRequest('PATCH', `/manga/${entry.malId}/my_list_status`, body);
+                  if (!res.ok) {
+                    const text = await res.text();
+                    throw new Error(`MAL ${res.status}: ${text.slice(0, 120)}`);
+                  }
+                  malUpdated++;
+                }
+              }
+
+              // Update Rolia (best-effort — needs open Rolia tab)
+              if (applyRolia && entry.slug && entry.status) {
+                const roliaId = slugMappings[entry.slug]?.roliaId ?? null;
+                if (roliaId) {
+                  const tabs = await api.tabs.query({ url: 'https://roliascan.com/*' });
+                  const tabId = tabs[0]?.id ?? null;
+                  if (tabId) {
+                    await setRoliaStatus(roliaId, entry.status, tabId, entry.slug);
+                    roliaUpdated++;
+                  }
+                }
+              }
+            } catch (err) {
+              errors.push(`${entry.malTitle ?? entry.slug ?? '?'}: ${err.message}`);
+            }
+          }
+
+          await syncSet('slugMappings', slugMappings);
+          sendResponse({ ok: true, results: { mappingsUpdated, malUpdated, roliaUpdated, errors } });
+        } catch (err) {
+          sendResponse({ ok: false, error: err.message });
+        }
+      })();
+      return true;
+
     default:
       sendResponse({ ok: false, error: 'Unknown message type' });
   }
@@ -1263,25 +1325,17 @@ async function migrateToSync() {
     'mal_client_id', 'mal_token',
   ];
   try {
-    const allLocal = await api.storage.local.get(null);
-    const allSync  = await api.storage.sync.get(null).catch(() => ({}));
-    console.error('[RoliaSync] ALL local keys:', Object.keys(allLocal));
-    console.error('[RoliaSync] ALL sync keys:',  Object.keys(allSync));
-
-    const localData = allLocal;
-    const syncData  = allSync;
+    const [localData, syncData] = await Promise.all([
+      api.storage.local.get(keys),
+      api.storage.sync.get(keys).catch(() => ({})),
+    ]);
     for (const key of keys) {
       if (localData[key] !== undefined && syncData[key] === undefined) {
-        console.error('[RoliaSync] Migrating key:', key, '→ sync');
         await api.storage.sync.set({ [key]: localData[key] }).catch(() => {});
         await api.storage.local.remove(key).catch(() => {});
       }
     }
-    console.error('[RoliaSync] Sync storage after migration:',
-      await api.storage.sync.get(null).catch(() => ({})));
-    console.error('[RoliaSync] Local storage after migration:',
-      await api.storage.local.get(null));
-  } catch (e) { console.error('[RoliaSync] migrateToSync error:', e); }
+  } catch { /* non-fatal — sync may be unavailable */ }
 }
 
 // ─── Browser action — Android: open popup as tab (desktop uses default_popup) ──

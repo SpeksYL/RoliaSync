@@ -699,6 +699,71 @@
       color: #90caf9;
       font-size: 13px;
     }
+
+    /* ═══════════════════════════════════════════════════════════════ */
+    /* ── CSV IMPORT ── */
+    /* ═══════════════════════════════════════════════════════════════ */
+
+    #csv-section { margin-bottom: 20px; }
+
+    #csv-section code {
+      font-family: 'Courier New', monospace;
+      background: #0d1117;
+      padding: 1px 5px;
+      border-radius: 4px;
+      font-size: 11px;
+      color: #a5d6a7;
+    }
+
+    .csv-file-label {
+      display: inline-block;
+      cursor: pointer;
+    }
+
+    #csv-file-name {
+      font-size: 12px;
+      color: #546e7a;
+      align-self: center;
+    }
+
+    #csv-format-info {
+      font-size: 12px;
+      color: #90caf9;
+      margin-bottom: 8px;
+    }
+
+    #csv-progress-fill {
+      background: #2196f3;
+      height: 100%;
+      border-radius: 6px;
+      width: 0%;
+      transition: width 0.3s;
+    }
+
+    .csv-preview-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 12px;
+    }
+
+    .csv-preview-table thead { background: #16213e; }
+
+    .csv-preview-table th {
+      padding: 9px 12px;
+      text-align: left;
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      color: #90caf9;
+      white-space: nowrap;
+    }
+
+    .csv-preview-table tbody tr { border-top: 1px solid #1e2a3a; }
+    .csv-preview-table td { padding: 7px 12px; color: #e0e0e0; vertical-align: middle; }
+    .csv-preview-table td.td-mono { font-family: 'Courier New', monospace; font-size: 11px; color: #a5d6a7; }
+    .csv-preview-table td.td-dim  { color: #546e7a; }
+    .csv-more-rows { font-size: 11px; color: #546e7a; padding: 6px 12px; }
   </style>
 </head>
 <body>
@@ -891,6 +956,71 @@
 
   <!-- ═══ IMPORT ════════════════════════════════════════════════════ -->
   <div class="tab-panel wide-panel" data-panel="import">
+
+    <!-- CSV Import section -->
+    <div class="section" id="csv-section">
+      <div class="section-title">Import from CSV</div>
+      <p class="hint" style="margin-bottom:14px;">
+        Supports <strong>RoliaSync CSV</strong> (<code>slug,mal_id,status,chapters_read</code>)
+        and <strong>MAL Export CSV</strong> from
+        <a href="https://myanimelist.net/panel.php?go=export" target="_blank">myanimelist.net/panel.php?go=export</a>.
+        Format is detected automatically from the header row.
+      </p>
+
+      <div class="toggle-row">
+        <div>
+          <div class="toggle-label">Update MAL list entries</div>
+          <div class="toggle-hint">PATCH chapters read and status on MAL for each row</div>
+        </div>
+        <input type="checkbox" id="csv-apply-mal" checked />
+      </div>
+
+      <div class="toggle-row">
+        <div>
+          <div class="toggle-label">Update Rolia status</div>
+          <div class="toggle-hint">Sync status to roliascan.com (requires an open Rolia tab)</div>
+        </div>
+        <input type="checkbox" id="csv-apply-rolia" />
+      </div>
+
+      <div class="btn-row">
+        <label class="btn btn-secondary csv-file-label" for="csv-file-input">📂 Choose CSV file</label>
+        <input type="file" id="csv-file-input" accept=".csv" style="display:none;" />
+        <span id="csv-file-name"></span>
+      </div>
+
+      <!-- Preview (shown after file selected) -->
+      <div id="csv-preview-wrap" style="display:none; margin-top:16px;">
+        <div id="csv-format-info"></div>
+        <div class="import-table-wrap" style="margin-bottom:12px;">
+          <table class="csv-preview-table">
+            <thead>
+              <tr>
+                <th>Title / Slug</th>
+                <th>MAL ID</th>
+                <th>Status</th>
+                <th>Chapters</th>
+              </tr>
+            </thead>
+            <tbody id="csv-preview-body"></tbody>
+          </table>
+          <div id="csv-more-rows" class="csv-more-rows" style="display:none;"></div>
+        </div>
+        <div class="btn-row">
+          <button class="btn btn-danger" id="btn-csv-import">Import</button>
+          <button class="btn btn-secondary" id="btn-csv-cancel">Cancel</button>
+        </div>
+      </div>
+
+      <!-- Progress -->
+      <div id="csv-progress-wrap" style="display:none; margin-top:16px;">
+        <div id="csv-progress-label" style="font-size:12px; color:#90caf9; margin-bottom:6px;">Importing…</div>
+        <div class="progress-bg"><div id="csv-progress-fill"></div></div>
+      </div>
+
+      <!-- Result -->
+      <div id="csv-result" class="msg" style="display:none; margin-top:12px;"></div>
+    </div>
 
     <!-- No data state -->
     <div id="import-empty" class="import-empty">
