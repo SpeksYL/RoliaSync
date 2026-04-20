@@ -626,7 +626,7 @@ async function syncChapter(slug, chapter, tabId = null, totalRoliaChapters = nul
 
     const isFirstRead = currentChapter === 0;
 
-    // Load manga meta — prefer cached mapping fields, otherwise fetch live
+    // Load manga meta — prefer cached mapping fields, otherwise fetch live (awaited)
     const hasCachedMeta = mapping.isFinished != null || mapping.isOngoing != null;
     let liveMeta = null;
     if (!hasCachedMeta) {
@@ -634,10 +634,11 @@ async function syncChapter(slug, chapter, tabId = null, totalRoliaChapters = nul
       if (liveMeta) await saveMangaMetaToCache(slug, liveMeta);
     }
 
+    const effectiveMeta = liveMeta ?? mapping;
     const malFinished   = info.malStatus === 'finished';
-    const mangaFinished = (liveMeta ?? mapping).isFinished ?? malFinished;
-    const mangaOngoing  = (liveMeta ?? mapping).isOngoing  ?? !malFinished;
-    const roliaId       = (liveMeta ?? mapping).roliaId    ?? null;
+    const mangaFinished = effectiveMeta.isFinished ?? malFinished;
+    const mangaOngoing  = effectiveMeta.isOngoing  ?? !malFinished;
+    const roliaId       = effectiveMeta.roliaId    ?? null;
 
     // isLastChapter: use the lower of MAL total and Rolia total so that
     // specials/extras on MAL (e.g. MAL=170, Rolia=167) don't delay On Hold/Completed.
@@ -647,6 +648,16 @@ async function syncChapter(slug, chapter, tabId = null, totalRoliaChapters = nul
     const minTotal   = (malTotal && roliaTotal) ? Math.min(malTotal, roliaTotal)
                      : (malTotal ?? roliaTotal ?? null);
     const isLastChapter = minTotal !== null && chapterNum >= minTotal;
+
+    console.error('[RoliaSync] doSync meta:', effectiveMeta,
+      'isLastChapter:', isLastChapter,
+      'chapterNum:', chapterNum,
+      'minTotal:', minTotal,
+      'malTotal:', malTotal,
+      'roliaTotal:', roliaTotal,
+      'isFirstRead:', isFirstRead,
+      'mangaFinished:', mangaFinished,
+      'mangaOngoing:', mangaOngoing);
 
     if (!autoSettings.neverChange) {
       const { autoStatusLocks = [] } = await api.storage.local.get('autoStatusLocks');
