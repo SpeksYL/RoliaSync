@@ -406,7 +406,7 @@ async function getMalId(slug) {
 
 async function saveSlugMapping(slug, malId, malTitle) {
   const { slugMappings = {} } = await syncGet('slugMappings');
-  const { mangaMeta = {} }    = await api.storage.local.get('mangaMeta');
+  const { mangaMeta = {} }    = await syncGet('mangaMeta');
   const existing = slugMappings[slug] ?? {};
   const meta     = mangaMeta[slug]    ?? {};
   slugMappings[slug] = {
@@ -498,13 +498,13 @@ async function saveMangaMetaToCache(slug, meta) {
       if (meta.isFinished!= null) slugMappings[slug].isFinished= meta.isFinished;
       await syncSet({ slugMappings });
     } else {
-      const { mangaMeta = {} } = await api.storage.local.get('mangaMeta');
+      const { mangaMeta = {} } = await syncGet('mangaMeta');
       mangaMeta[slug] = {
         roliaId:    meta.roliaId,
         isOngoing:  meta.isOngoing,
         isFinished: meta.isFinished,
       };
-      await api.storage.local.set({ mangaMeta });
+      await syncSet({ mangaMeta });
     }
   } catch { /* non-fatal */ }
 }
@@ -660,7 +660,7 @@ async function syncChapter(slug, chapter, tabId = null, totalRoliaChapters = nul
       'mangaOngoing:', mangaOngoing);
 
     if (!autoSettings.neverChange) {
-      const { autoStatusLocks = [] } = await api.storage.local.get('autoStatusLocks');
+      const { autoStatusLocks = [] } = await syncGet('autoStatusLocks');
       const locked = autoStatusLocks.includes(slug);
 
       if (!locked) {
@@ -964,13 +964,13 @@ api.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
             await syncSet({ slugMappings });
           } else {
             // No MAL mapping yet — cache for later merge in saveSlugMapping
-            const { mangaMeta = {} } = await api.storage.local.get('mangaMeta');
+            const { mangaMeta = {} } = await syncGet('mangaMeta');
             mangaMeta[msg.slug] = {
               roliaId:    msg.roliaId,
               isOngoing:  msg.isOngoing,
               isFinished: msg.isFinished,
             };
-            await api.storage.local.set({ mangaMeta });
+            await syncSet({ mangaMeta });
           }
           sendResponse({ ok: true });
         } catch (err) {
@@ -1211,10 +1211,10 @@ api.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
           // Lock auto-status — but only for user-initiated status changes,
           // not when background.js itself triggered the Rolia POST.
           if (!_autoStatusInProgress.has(slug)) {
-            const { autoStatusLocks = [] } = await api.storage.local.get('autoStatusLocks');
+            const { autoStatusLocks = [] } = await syncGet('autoStatusLocks');
             if (!autoStatusLocks.includes(slug)) {
               autoStatusLocks.push(slug);
-              await api.storage.local.set({ autoStatusLocks });
+              await syncSet({ autoStatusLocks });
             }
           }
 
@@ -1249,6 +1249,29 @@ api.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
   }
 });
 
+// ─── Migration: move settings from storage.local → storage.sync ──────────────
+
+async function migrateToSync() {
+  const keys = [
+    'slugMappings', 'mangaMeta', 'mal_credentials',
+    'general_settings', 'notification_settings',
+    'auto_status_settings', 'autoStatusLocks',
+    'mal_client_id', 'mal_token',
+  ];
+  try {
+    const [localData, syncData] = await Promise.all([
+      api.storage.local.get(keys),
+      api.storage.sync.get(keys).catch(() => ({})),
+    ]);
+    for (const key of keys) {
+      if (localData[key] !== undefined && syncData[key] === undefined) {
+        await api.storage.sync.set({ [key]: localData[key] }).catch(() => {});
+        await api.storage.local.remove(key).catch(() => {});
+      }
+    }
+  } catch { /* non-fatal — sync may be unavailable */ }
+}
+
 // ─── Browser action — Android: open popup as tab (desktop uses default_popup) ──
 
 api.browserAction.onClicked.addListener(async () => {
@@ -1259,9 +1282,10 @@ api.browserAction.onClicked.addListener(async () => {
   }
 });
 
-// ─── First install: open settings page if Client ID is missing ────────────────
+// ─── First install / update ───────────────────────────────────────────────────
 
 api.runtime.onInstalled.addListener(async ({ reason }) => {
+  await migrateToSync();
   if (reason === 'install') {
     const { mal_client_id } = await syncGet('mal_client_id');
     if (!mal_client_id) {
@@ -1269,3 +1293,7 @@ api.runtime.onInstalled.addListener(async ({ reason }) => {
     }
   }
 });
+
+// Run migration once on each background script startup (covers existing installs
+// that don't trigger onInstalled, e.g. after browser restart or extension reload).
+migrateToSync();
