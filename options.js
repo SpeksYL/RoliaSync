@@ -22,8 +22,6 @@ const btnSaveGeneral     = document.getElementById('btn-save-general');
 const generalMsg         = document.getElementById('general-msg');
 
 // ─── DOM refs — Notifications ─────────────────────────────────────────────────
-const notifBrowser     = document.getElementById('notif-browser');
-const notifToast       = document.getElementById('notif-toast');
 const notifErrorsOnly  = document.getElementById('notif-errors-only');
 const btnSaveNotif     = document.getElementById('btn-save-notif');
 const notifMsg         = document.getElementById('notif-msg');
@@ -172,9 +170,7 @@ async function initGeneralTab() {
 
     const notifRes = await sendMsg('GET_NOTIFICATION_SETTINGS');
     if (notifRes.ok && notifRes.settings) {
-      if (notifBrowser)    notifBrowser.checked    = notifRes.settings.browserNotifications ?? true;
-      if (notifToast)      notifToast.checked      = notifRes.settings.inPageToast          ?? true;
-      if (notifErrorsOnly) notifErrorsOnly.checked = notifRes.settings.errorsOnly           ?? false;
+      if (notifErrorsOnly) notifErrorsOnly.checked = notifRes.settings.errorsOnly ?? false;
     }
 
     const autoRes = await sendMsg('GET_AUTO_STATUS_SETTINGS');
@@ -250,9 +246,7 @@ if (btnSaveGeneral) {
 if (btnSaveNotif) {
   btnSaveNotif.addEventListener('click', async () => {
     const settings = {
-      browserNotifications: notifBrowser?.checked   ?? true,
-      inPageToast:          notifToast?.checked      ?? true,
-      errorsOnly:           notifErrorsOnly?.checked ?? false,
+      errorsOnly: notifErrorsOnly?.checked ?? false,
     };
 
     btnSaveNotif.disabled    = true;

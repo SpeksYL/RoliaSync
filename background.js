@@ -423,9 +423,7 @@ async function saveSlugMapping(slug, malId, malTitle) {
 async function getNotificationSettings() {
   const { notification_settings } = await syncGet('notification_settings');
   return {
-    browserNotifications: notification_settings?.browserNotifications ?? true,
-    inPageToast:          notification_settings?.inPageToast          ?? true,
-    errorsOnly:           notification_settings?.errorsOnly           ?? false,
+    errorsOnly: notification_settings?.errorsOnly ?? false,
   };
 }
 
@@ -450,7 +448,15 @@ async function sendMessageToTab(tabId, message, timeout = 5000) {
     const timer = setTimeout(() => resolve(null), timeout);
     api.tabs.sendMessage(tabId, message)
       .then(response => { clearTimeout(timer); resolve(response); })
-      .catch(() => { clearTimeout(timer); resolve(null); });
+      .catch(err => {
+        clearTimeout(timer);
+        const msg = err?.message ?? '';
+        if (!msg.includes('Could not establish connection') &&
+            !msg.includes('Receiving end does not exist')) {
+          console.error('[RoliaSync] sendMessageToTab error:', msg);
+        }
+        resolve(null);
+      });
   });
 }
 
@@ -530,46 +536,15 @@ async function getGeneralSettings() {
 // ─── Notifications ────────────────────────────────────────────────────────────
 
 async function showNotification(type, message, tabId = null) {
+  if (tabId == null) return;
   const settings = await getNotificationSettings();
-
   if (settings.errorsOnly && type === 'success') return;
-
-  // Toast is the primary notification — always show when we have a tab
-  if (settings.inPageToast && tabId != null) {
-    sendMessageToTab(tabId, {
-      action:  'SHOW_TOAST',
-      message,
-      type:    type === 'success' ? 'success' : 'error',
-    });
-  }
-
-  // Browser notification is additional/optional
-  if (settings.browserNotifications) {
-    try {
-      api.notifications.create({
-        type:    'basic',
-        iconUrl: 'icons/icon48.png',
-        title:   type === 'success' ? '✅ RoliaSync' : '⚠️ RoliaSync',
-        message,
-      });
-    } catch { /* browser.notifications not available on this platform */ }
-  }
+  sendMessageToTab(tabId, {
+    action:  'SHOW_TOAST',
+    message,
+    type:    type === 'success' ? 'success' : 'error',
+  });
 }
-
-api.notifications.onClicked.addListener((notificationId) => {
-  if (notificationId.startsWith('not_found_')) {
-    const slug = notificationId.slice('not_found_'.length);
-    api.tabs.create({
-      url: api.runtime.getURL('options.html') + `?slug=${encodeURIComponent(slug)}#mappings`,
-    });
-    api.notifications.clear(notificationId);
-  }
-
-  if (notificationId.startsWith('skipped_')) {
-    api.tabs.create({ url: api.runtime.getURL('history.html') });
-    api.notifications.clear(notificationId);
-  }
-});
 
 // ─── Sync logic ───────────────────────────────────────────────────────────────
 
@@ -599,15 +574,7 @@ async function syncChapter(slug, chapter, tabId = null, totalRoliaChapters = nul
     historyEntry.status   = 'not_found';
     historyEntry.errorMsg = 'Not found on MAL — assign manually';
     await api.storage.local.set({ pending_sync: { slug, chapter } });
-    try {
-      api.notifications.create(`not_found_${slug}`, {
-        type:     'basic',
-        iconUrl:  'icons/icon48.png',
-        title:    '⚠️ RoliaSync',
-        message:  `${slug} not found on MAL — assign manually?`,
-        priority: 1,
-      });
-    } catch { /* browser.notifications not available */ }
+    await showNotification('error', `${slug} not found on MAL — assign manually`, tabId);
   };
 
   const doSync = async () => {
@@ -624,14 +591,7 @@ async function syncChapter(slug, chapter, tabId = null, totalRoliaChapters = nul
 
     if (chapterNum < currentChapter) {
       console.error('[RoliaSync] Skipped reason: chapter behind MAL progress', 'slug:', slug, 'chapter:', chapterNum, 'malProgress:', currentChapter);
-      try {
-        api.notifications.create(`skipped_${slug}`, {
-          type:    'basic',
-          iconUrl: 'icons/icon48.png',
-          title:   '⏭️ Sync skipped',
-          message: `Ch.${chapter} already on MAL (Ch.${currentChapter}). You can force sync from the history page.`,
-        });
-      } catch { /* browser.notifications not available */ }
+      await showNotification('error', `Ch.${chapter} already on MAL (Ch.${currentChapter}). Force sync from history.`, tabId);
       historyEntry.status   = 'skipped';
       historyEntry.malId    = malId;
       historyEntry.errorMsg = `MAL progress: Ch.${currentChapter}`;
@@ -941,9 +901,7 @@ api.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
       (async () => {
         try {
           const settings = {
-            browserNotifications: msg.settings?.browserNotifications ?? true,
-            inPageToast:          msg.settings?.inPageToast          ?? true,
-            errorsOnly:           msg.settings?.errorsOnly           ?? false,
+            errorsOnly: msg.settings?.errorsOnly ?? false,
           };
           await syncSet({ notification_settings: settings });
           sendResponse({ ok: true });
@@ -1273,6 +1231,20 @@ api.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
 
     default:
       sendResponse({ ok: false, error: 'Unknown message type' });
+  }
+});
+
+// ─── Browser action — open popup or tab depending on platform ─────────────────
+
+api.browserAction.onClicked.addListener(async () => {
+  const info = await api.runtime.getPlatformInfo();
+  if (info.os === 'android') {
+    api.tabs.create({ url: api.runtime.getURL('popup.html') });
+  } else {
+    api.browserAction.openPopup().catch(() => {
+      // Fallback: open as tab if openPopup() is unavailable
+      api.tabs.create({ url: api.runtime.getURL('popup.html') });
+    });
   }
 });
 

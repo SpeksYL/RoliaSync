@@ -1,7 +1,7 @@
 {
   "manifest_version": 2,
   "name": "RoliaSync",
-  "version": "1.5.2",
+  "version": "1.5.3",
   "description": "Syncs read manga chapters from roliascan.com to MyAnimeList. Supports bulk import from bookmarks and automatic reading status.",
 
   "browser_specific_settings": {
@@ -20,7 +20,6 @@
 
   "permissions": [
     "storage",
-    "notifications",
     "tabs",
     "identity",
     "webNavigation",
@@ -47,7 +46,6 @@
   ],
 
   "browser_action": {
-    "default_popup": "popup.html",
     "default_icon": {
       "16":  "icons/icon16.png",
       "32":  "icons/icon32.png",
