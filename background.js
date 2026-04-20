@@ -554,7 +554,7 @@ api.notifications.onClicked.addListener((notificationId) => {
 
 // ─── Sync logic ───────────────────────────────────────────────────────────────
 
-async function syncChapter(slug, chapter, tabId = null, totalRoliaChapters = null) {
+async function syncChapter(slug, chapter, tabId = null, totalRoliaChapters = null, isEndChapter = false) {
   // Respect per-manga sync toggle
   const { slugMappings: _sm = {} } = await syncGet('slugMappings');
   if (_sm[slug]?.syncEnabled === false) return;
@@ -644,18 +644,23 @@ async function syncChapter(slug, chapter, tabId = null, totalRoliaChapters = nul
     const roliaTotal = (liveMeta?.totalChapters > 0 ? liveMeta.totalChapters : null)
                     ?? (totalRoliaChapters > 0 ? totalRoliaChapters : null);
 
-    // For finished manga Rolia is authoritative — trigger on either total.
-    // For ongoing manga use the minimum so MAL specials don't delay On Hold.
+    // isEndChapter from DOM (no "Next Chapter" link) has highest priority.
+    // Fallback: chapter number comparison against known totals.
     let isLastChapter;
-    if (effectiveMeta?.isFinished) {
+    if (isEndChapter) {
+      isLastChapter = true;
+    } else if (effectiveMeta?.isFinished) {
+      // Finished manga — Rolia is authoritative; trigger on either total
       isLastChapter = (roliaTotal > 0 && chapterNum >= roliaTotal) ||
                       (malTotal   > 0 && chapterNum >= malTotal);
     } else {
+      // Ongoing — use minimum so MAL specials don't delay On Hold
       const minTotal = Math.min(roliaTotal || Infinity, malTotal || Infinity);
       isLastChapter  = minTotal > 0 && minTotal < Infinity && chapterNum >= minTotal;
     }
 
     console.error('[RoliaSync] doSync meta:', effectiveMeta,
+      'isEndChapter:', isEndChapter,
       'isLastChapter:', isLastChapter,
       'chapterNum:', chapterNum,
       'malTotal:', malTotal,
@@ -767,7 +772,7 @@ api.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
   switch (action) {
 
     case 'SYNC_CHAPTER':
-      syncChapter(msg.slug, msg.chapter, _sender.tab?.id ?? null, msg.totalRoliaChapters ?? null)
+      syncChapter(msg.slug, msg.chapter, _sender.tab?.id ?? null, msg.totalRoliaChapters ?? null, msg.isEndChapter ?? false)
         .then(() => sendResponse({ ok: true }))
         .catch(err => sendResponse({ ok: false, error: err.message }));
       return true;

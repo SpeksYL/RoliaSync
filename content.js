@@ -166,6 +166,16 @@ function extractTotalRoliaChapters() {
   return null;
 }
 
+function detectEndChapter() {
+  // No "Next Chapter" link → this is the last available chapter
+  const hasNextChapter = !![...document.querySelectorAll('a[href*="/read/"]')]
+    .find(a =>
+      a.title?.toLowerCase().includes('next') ||
+      a.textContent.toLowerCase().includes('next chapter')
+    );
+  return !hasNextChapter;
+}
+
 function sendSync(parsed) {
   const chapterNum = parseFloat(parsed.chapter);
   console.error('[RoliaSync] URL:', parsed.url, 'chapter:', chapterNum);
@@ -175,6 +185,9 @@ function sendSync(parsed) {
     return;
   }
 
+  const isEndChapter = detectEndChapter();
+  console.error('[RoliaSync] isEndChapter:', isEndChapter);
+
   api.runtime.sendMessage(
     {
       type:               'SYNC_CHAPTER',
@@ -182,6 +195,7 @@ function sendSync(parsed) {
       chapter:            parsed.chapter,
       url:                parsed.url,
       totalRoliaChapters: extractTotalRoliaChapters(),
+      isEndChapter,
     },
     (response) => {
       if (api.runtime.lastError || !response?.ok) { /* ignore — background handles retry */ }
