@@ -20,17 +20,19 @@ const RETRY_DELAY_MS         = 3000;
 
 async function syncGet(key) {
   try {
-    return await api.storage.sync.get(key);
+    const result = await api.storage.sync.get(key);
+    return result[key];
   } catch {
-    return await api.storage.local.get(key);
+    const result = await api.storage.local.get(key);
+    return result[key];
   }
 }
 
-async function syncSet(obj) {
+async function syncSet(key, value) {
   try {
-    await api.storage.sync.set(obj);
+    await api.storage.sync.set({ [key]: value });
   } catch {
-    await api.storage.local.set(obj);
+    await api.storage.local.set({ [key]: value });
   }
 }
 
@@ -42,7 +44,7 @@ async function syncRemove(keys) {
 // ─── Client ID ────────────────────────────────────────────────────────────────
 
 async function getClientId() {
-  const { mal_client_id } = await syncGet('mal_client_id');
+  const mal_client_id = await syncGet('mal_client_id');
   if (!mal_client_id) {
     throw new Error('No MAL Client ID configured — please enter one in the settings');
   }
@@ -228,8 +230,8 @@ async function exchangeCodeForToken(code) {
 // ─── Token management ─────────────────────────────────────────────────────────
 
 async function refreshAccessToken() {
-  const clientId      = await getClientId();
-  const { mal_token } = await syncGet('mal_token');
+  const clientId = await getClientId();
+  const mal_token = await syncGet('mal_token');
   if (!mal_token?.refresh_token) throw new Error('No refresh token available');
 
   const body = new URLSearchParams({
@@ -256,16 +258,16 @@ async function saveToken(data) {
     refresh_token: data.refresh_token,
     expires_at:    Date.now() + data.expires_in * 1000,
   };
-  await syncSet({ mal_token: token });
+  await syncSet('mal_token', token);
 }
 
 async function getValidToken() {
-  const { mal_token } = await syncGet('mal_token');
+  const mal_token = await syncGet('mal_token');
   if (!mal_token) throw new Error('Not signed in');
 
   if (Date.now() >= mal_token.expires_at - 60_000) {
     await refreshAccessToken();
-    const { mal_token: refreshed } = await syncGet('mal_token');
+    const refreshed = await syncGet('mal_token');
     return refreshed.access_token;
   }
 
@@ -389,7 +391,8 @@ function buildStatusPatchBody(status, currentInfo = null) {
 // ─── Slug mapping ─────────────────────────────────────────────────────────────
 
 async function getMalId(slug) {
-  const { slugMappings = {} } = await syncGet('slugMappings');
+  const slugMappings = (await syncGet('slugMappings')) ?? {};
+  console.error('[RoliaSync] getMalId read:', slug, '→', slugMappings[slug]);
 
   if (slugMappings[slug]) {
     const mapping = slugMappings[slug];
@@ -405,8 +408,8 @@ async function getMalId(slug) {
 }
 
 async function saveSlugMapping(slug, malId, malTitle) {
-  const { slugMappings = {} } = await syncGet('slugMappings');
-  const { mangaMeta = {} }    = await syncGet('mangaMeta');
+  const slugMappings = (await syncGet('slugMappings')) ?? {};
+  const mangaMeta    = (await syncGet('mangaMeta'))    ?? {};
   const existing = slugMappings[slug] ?? {};
   const meta     = mangaMeta[slug]    ?? {};
   slugMappings[slug] = {
@@ -415,20 +418,21 @@ async function saveSlugMapping(slug, malId, malTitle) {
     id:    malId,
     title: malTitle,
   };
-  await syncSet({ slugMappings });
+  console.error('[RoliaSync] saveSlugMapping write:', slug, slugMappings[slug]);
+  await syncSet('slugMappings', slugMappings);
 }
 
 // ─── Settings helpers ─────────────────────────────────────────────────────────
 
 async function getNotificationSettings() {
-  const { notification_settings } = await syncGet('notification_settings');
+  const notification_settings = await syncGet('notification_settings');
   return {
     errorsOnly: notification_settings?.errorsOnly ?? false,
   };
 }
 
 async function getAutoStatusSettings() {
-  const { auto_status_settings } = await syncGet('auto_status_settings');
+  const auto_status_settings = await syncGet('auto_status_settings');
   const s = auto_status_settings ?? {};
   return {
     syncStatus:         s.syncStatus         ?? true,
@@ -491,20 +495,20 @@ async function getMangaMetaLive(slug, tabId) {
 
 async function saveMangaMetaToCache(slug, meta) {
   try {
-    const { slugMappings = {} } = await syncGet('slugMappings');
+    const slugMappings = (await syncGet('slugMappings')) ?? {};
     if (slugMappings[slug]) {
       if (meta.roliaId   != null) slugMappings[slug].roliaId   = meta.roliaId;
       if (meta.isOngoing != null) slugMappings[slug].isOngoing = meta.isOngoing;
       if (meta.isFinished!= null) slugMappings[slug].isFinished= meta.isFinished;
-      await syncSet({ slugMappings });
+      await syncSet('slugMappings', slugMappings);
     } else {
-      const { mangaMeta = {} } = await syncGet('mangaMeta');
+      const mangaMeta = (await syncGet('mangaMeta')) ?? {};
       mangaMeta[slug] = {
         roliaId:    meta.roliaId,
         isOngoing:  meta.isOngoing,
         isFinished: meta.isFinished,
       };
-      await syncSet({ mangaMeta });
+      await syncSet('mangaMeta', mangaMeta);
     }
   } catch { /* non-fatal */ }
 }
@@ -538,7 +542,7 @@ async function setRoliaStatus(roliaId, status, tabId, slug = null) {
 }
 
 async function getGeneralSettings() {
-  const { general_settings } = await syncGet('general_settings');
+  const general_settings = await syncGet('general_settings');
   return {
     showImportButton: general_settings?.showImportButton ?? true,
   };
@@ -561,7 +565,7 @@ async function showNotification(type, message, tabId = null) {
 
 async function syncChapter(slug, chapter, tabId = null, totalRoliaChapters = null, isEndChapter = false) {
   // Respect per-manga sync toggle
-  const { slugMappings: _sm = {} } = await syncGet('slugMappings');
+  const _sm = (await syncGet('slugMappings')) ?? {};
   if (_sm[slug]?.syncEnabled === false) return;
   const mapping = _sm[slug] ?? {};
 
@@ -660,7 +664,7 @@ async function syncChapter(slug, chapter, tabId = null, totalRoliaChapters = nul
       'mangaOngoing:', mangaOngoing);
 
     if (!autoSettings.neverChange) {
-      const { autoStatusLocks = [] } = await syncGet('autoStatusLocks');
+      const autoStatusLocks = (await syncGet('autoStatusLocks')) ?? [];
       const locked = autoStatusLocks.includes(slug);
 
       if (!locked) {
@@ -819,7 +823,7 @@ api.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
 
     case 'GET_STATUS':
       (async () => {
-        const { mal_token } = await syncGet('mal_token');
+        const mal_token = await syncGet('mal_token');
         const loggedIn = !!mal_token;
         let username = null;
         if (loggedIn) {
@@ -861,14 +865,14 @@ api.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
 
     case 'GET_MAPPINGS':
       (async () => {
-        const { slugMappings = {} } = await syncGet('slugMappings');
+        const slugMappings = (await syncGet('slugMappings')) ?? {};
         sendResponse({ ok: true, mappings: slugMappings });
       })();
       return true;
 
     case 'GET_CONFIG':
       (async () => {
-        const { mal_client_id } = await syncGet('mal_client_id');
+        const mal_client_id = await syncGet('mal_client_id');
         let firefoxRedirect = null;
         try {
           if (api.identity && api.identity.getRedirectURL) {
@@ -889,7 +893,7 @@ api.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
         try {
           const id = (msg.clientId ?? '').trim();
           if (!id) throw new Error('Client ID must not be empty');
-          await syncSet({ mal_client_id: id });
+          await syncSet('mal_client_id', id);
           sendResponse({ ok: true });
         } catch (err) {
           sendResponse({ ok: false, error: err.message });
@@ -914,7 +918,7 @@ api.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
           const settings = {
             errorsOnly: msg.settings?.errorsOnly ?? false,
           };
-          await syncSet({ notification_settings: settings });
+          await syncSet('notification_settings', settings);
           sendResponse({ ok: true });
         } catch (err) {
           sendResponse({ ok: false, error: err.message });
@@ -944,7 +948,7 @@ api.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
             autoStatusComplete: msg.settings?.autoStatusComplete ?? true,
             syncStatusToRolia:  msg.settings?.syncStatusToRolia  ?? true,
           };
-          await syncSet({ auto_status_settings: settings });
+          await syncSet('auto_status_settings', settings);
           sendResponse({ ok: true });
         } catch (err) {
           sendResponse({ ok: false, error: err.message });
@@ -955,22 +959,22 @@ api.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
     case 'SAVE_MANGA_META':
       (async () => {
         try {
-          const { slugMappings = {} } = await syncGet('slugMappings');
+          const slugMappings = (await syncGet('slugMappings')) ?? {};
           if (slugMappings[msg.slug]) {
             // Mapping exists — enrich it directly
             if (msg.roliaId   != null) slugMappings[msg.slug].roliaId   = msg.roliaId;
             if (msg.isOngoing != null) slugMappings[msg.slug].isOngoing = msg.isOngoing;
             if (msg.isFinished!= null) slugMappings[msg.slug].isFinished= msg.isFinished;
-            await syncSet({ slugMappings });
+            await syncSet('slugMappings', slugMappings);
           } else {
             // No MAL mapping yet — cache for later merge in saveSlugMapping
-            const { mangaMeta = {} } = await syncGet('mangaMeta');
+            const mangaMeta = (await syncGet('mangaMeta')) ?? {};
             mangaMeta[msg.slug] = {
               roliaId:    msg.roliaId,
               isOngoing:  msg.isOngoing,
               isFinished: msg.isFinished,
             };
-            await syncSet({ mangaMeta });
+            await syncSet('mangaMeta', mangaMeta);
           }
           sendResponse({ ok: true });
         } catch (err) {
@@ -996,7 +1000,7 @@ api.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
           const settings = {
             showImportButton: msg.settings?.showImportButton ?? true,
           };
-          await syncSet({ general_settings: settings });
+          await syncSet('general_settings', settings);
           sendResponse({ ok: true });
         } catch (err) {
           sendResponse({ ok: false, error: err.message });
@@ -1023,7 +1027,7 @@ api.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
     case 'GET_MAL_ID':
       (async () => {
         try {
-          const { slugMappings = {} } = await syncGet('slugMappings');
+          const slugMappings = (await syncGet('slugMappings')) ?? {};
           if (slugMappings[msg.slug]) {
             const m = slugMappings[msg.slug];
             sendResponse({ ok: true, malId: m.id, malTitle: m.title, confidence: 'high' });
@@ -1079,9 +1083,9 @@ api.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
     case 'DELETE_MAPPING':
       (async () => {
         try {
-          const { slugMappings = {} } = await syncGet('slugMappings');
+          const slugMappings = (await syncGet('slugMappings')) ?? {};
           delete slugMappings[msg.slug];
-          await syncSet({ slugMappings });
+          await syncSet('slugMappings', slugMappings);
           sendResponse({ ok: true });
         } catch (err) {
           sendResponse({ ok: false, error: err.message });
@@ -1093,7 +1097,7 @@ api.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
     case 'SYNC_STATUS':
       (async () => {
         try {
-          const { slugMappings: smSync = {} } = await syncGet('slugMappings');
+          const smSync = (await syncGet('slugMappings')) ?? {};
           if (smSync[msg.slug]?.syncEnabled === false) {
             sendResponse({ ok: true, skipped: true });
             return;
@@ -1163,7 +1167,7 @@ api.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
           }
 
           // Respect per-manga sync toggle
-          const { slugMappings: smRolia = {} } = await syncGet('slugMappings');
+          const smRolia = (await syncGet('slugMappings')) ?? {};
           if (smRolia[slug]?.syncEnabled === false) {
             sendResponse({ ok: true, skipped: true });
             return;
@@ -1211,10 +1215,10 @@ api.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
           // Lock auto-status — but only for user-initiated status changes,
           // not when background.js itself triggered the Rolia POST.
           if (!_autoStatusInProgress.has(slug)) {
-            const { autoStatusLocks = [] } = await syncGet('autoStatusLocks');
+            const autoStatusLocks = (await syncGet('autoStatusLocks')) ?? [];
             if (!autoStatusLocks.includes(slug)) {
               autoStatusLocks.push(slug);
-              await syncSet({ autoStatusLocks });
+              await syncSet('autoStatusLocks', autoStatusLocks);
             }
           }
 
@@ -1232,10 +1236,10 @@ api.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
     case 'SET_SYNC_ENABLED':
       (async () => {
         try {
-          const { slugMappings = {} } = await syncGet('slugMappings');
+          const slugMappings = (await syncGet('slugMappings')) ?? {};
           if (slugMappings[msg.slug]) {
             slugMappings[msg.slug].syncEnabled = msg.enabled;
-            await syncSet({ slugMappings });
+            await syncSet('slugMappings', slugMappings);
           }
           sendResponse({ ok: true });
         } catch (err) {
@@ -1259,17 +1263,25 @@ async function migrateToSync() {
     'mal_client_id', 'mal_token',
   ];
   try {
-    const [localData, syncData] = await Promise.all([
-      api.storage.local.get(keys),
-      api.storage.sync.get(keys).catch(() => ({})),
-    ]);
+    const allLocal = await api.storage.local.get(null);
+    const allSync  = await api.storage.sync.get(null).catch(() => ({}));
+    console.error('[RoliaSync] ALL local keys:', Object.keys(allLocal));
+    console.error('[RoliaSync] ALL sync keys:',  Object.keys(allSync));
+
+    const localData = allLocal;
+    const syncData  = allSync;
     for (const key of keys) {
       if (localData[key] !== undefined && syncData[key] === undefined) {
+        console.error('[RoliaSync] Migrating key:', key, '→ sync');
         await api.storage.sync.set({ [key]: localData[key] }).catch(() => {});
         await api.storage.local.remove(key).catch(() => {});
       }
     }
-  } catch { /* non-fatal — sync may be unavailable */ }
+    console.error('[RoliaSync] Sync storage after migration:',
+      await api.storage.sync.get(null).catch(() => ({})));
+    console.error('[RoliaSync] Local storage after migration:',
+      await api.storage.local.get(null));
+  } catch (e) { console.error('[RoliaSync] migrateToSync error:', e); }
 }
 
 // ─── Browser action — Android: open popup as tab (desktop uses default_popup) ──
@@ -1287,7 +1299,7 @@ api.browserAction.onClicked.addListener(async () => {
 api.runtime.onInstalled.addListener(async ({ reason }) => {
   await migrateToSync();
   if (reason === 'install') {
-    const { mal_client_id } = await syncGet('mal_client_id');
+    const mal_client_id = await syncGet('mal_client_id');
     if (!mal_client_id) {
       api.tabs.create({ url: api.runtime.getURL('options.html') });
     }
